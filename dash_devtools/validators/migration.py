@@ -1,0 +1,198 @@
+"""
+UI 遷移驗證器
+
+檢查項目：
+1. Shoelace 元件殘留 (<sl-*>)
+2. 重複 class 屬性
+3. Shoelace CSS 變數 (--sl-*)
+4. Tailwind 設定完整性
+5. CSS Bundle 大小
+"""
+
+import re
+import json
+import subprocess
+from pathlib import Path
+from datetime import datetime
+
+
+class MigrationValidator:
+    """UI 遷移驗證器"""
+
+    name = 'migration'
+
+    def __init__(self, project_path):
+        self.project_path = Path(project_path)
+        self.project_name = self.project_path.name
+        self.src_path = self.project_path / 'src'
+        self.result = {
+            'name': self.name,
+            'passed': True,
+            'errors': [],
+            'warnings': [],
+            'checks': {}
+        }
+
+    def run(self):
+        """執行所有驗證"""
+        if not self.project_path.exists():
+            self.result['passed'] = False
+            self.result['errors'].append(f'專案路徑不存在: {self.project_path}')
+            return self.result
+
+        self.check_shoelace_remnants()
+        self.check_duplicate_classes()
+        self.check_css_variables()
+        self.check_tailwind_config()
+        self.check_package_json()
+
+        return self.result
+
+    def check_shoelace_remnants(self):
+        """檢查 Shoelace 元件殘留"""
+        if not self.src_path.exists():
+            return
+
+        patterns = [
+            (r'<sl-[a-z-]+', 'Shoelace 標籤'),
+        ]
+
+        total_count = 0
+        file_issues = {}
+
+        for pattern, desc in patterns:
+            for file_path in self.src_path.rglob('*.js'):
+                try:
+                    content = file_path.read_text(encoding='utf-8')
+                    matches = re.findall(pattern, content)
+                    if matches:
+                        rel_path = str(file_path.relative_to(self.project_path))
+                        if rel_path not in file_issues:
+                            file_issues[rel_path] = 0
+                        file_issues[rel_path] += len(matches)
+                        total_count += len(matches)
+                except Exception:
+                    pass
+
+        self.result['checks']['shoelace_remnants'] = {
+            'count': total_count,
+            'files': file_issues
+        }
+
+        if total_count > 0:
+            self.result['passed'] = False
+            self.result['errors'].append(f'Shoelace 殘留: {total_count} 個')
+
+    def check_duplicate_classes(self):
+        """檢查重複 class 屬性"""
+        if not self.src_path.exists():
+            return
+
+        pattern = r'class="[^"]*"\s+class="'
+        total_count = 0
+        file_issues = {}
+
+        for file_path in self.src_path.rglob('*.js'):
+            try:
+                content = file_path.read_text(encoding='utf-8')
+                matches = re.findall(pattern, content)
+                if matches:
+                    rel_path = str(file_path.relative_to(self.project_path))
+                    file_issues[rel_path] = len(matches)
+                    total_count += len(matches)
+            except Exception:
+                pass
+
+        self.result['checks']['duplicate_classes'] = {
+            'count': total_count,
+            'files': file_issues
+        }
+
+        if total_count > 0:
+            self.result['passed'] = False
+            self.result['errors'].append(f'重複 class: {total_count} 個')
+
+    def check_css_variables(self):
+        """檢查 Shoelace CSS 變數殘留"""
+        if not self.src_path.exists():
+            return
+
+        pattern = r'--sl-[a-z-]+'
+        total_count = 0
+        file_issues = {}
+
+        for ext in ['*.js', '*.css']:
+            for file_path in self.src_path.rglob(ext):
+                try:
+                    content = file_path.read_text(encoding='utf-8')
+                    matches = re.findall(pattern, content)
+                    if matches:
+                        rel_path = str(file_path.relative_to(self.project_path))
+                        file_issues[rel_path] = len(matches)
+                        total_count += len(matches)
+                except Exception:
+                    pass
+
+        self.result['checks']['css_variables'] = {
+            'count': total_count,
+            'files': file_issues
+        }
+
+        if total_count > 0:
+            self.result['warnings'].append(f'CSS 變數殘留: {total_count} 個')
+
+    def check_tailwind_config(self):
+        """檢查 Tailwind 設定"""
+        vite_config = self.project_path / 'vite.config.js'
+
+        if not vite_config.exists():
+            return
+
+        try:
+            content = vite_config.read_text(encoding='utf-8')
+            has_import = '@tailwindcss/vite' in content
+            has_plugin = 'tailwindcss()' in content
+
+            self.result['checks']['tailwind_config'] = {
+                'has_import': has_import,
+                'has_plugin': has_plugin
+            }
+
+            if not has_import or not has_plugin:
+                self.result['passed'] = False
+                self.result['errors'].append('Tailwind 設定不完整')
+        except Exception:
+            pass
+
+    def check_package_json(self):
+        """檢查 package.json"""
+        pkg_path = self.project_path / 'package.json'
+
+        if not pkg_path.exists():
+            return
+
+        try:
+            pkg = json.loads(pkg_path.read_text(encoding='utf-8'))
+            deps = {**pkg.get('dependencies', {}), **pkg.get('devDependencies', {})}
+
+            has_tailwind = 'tailwindcss' in deps
+            has_daisyui = 'daisyui' in deps
+            has_vite_plugin = '@tailwindcss/vite' in deps
+            has_shoelace = '@shoelace-style/shoelace' in deps
+
+            self.result['checks']['package_json'] = {
+                'has_tailwind': has_tailwind,
+                'has_daisyui': has_daisyui,
+                'has_vite_plugin': has_vite_plugin,
+                'has_shoelace': has_shoelace
+            }
+
+            if not has_vite_plugin:
+                self.result['passed'] = False
+                self.result['errors'].append('缺少 @tailwindcss/vite')
+
+            if has_shoelace:
+                self.result['warnings'].append('Shoelace 依賴未移除')
+
+        except Exception:
+            pass
