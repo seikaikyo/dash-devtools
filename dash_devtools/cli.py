@@ -97,14 +97,20 @@ def validate(project, validate_all, check, fix, output):
 
     # 如果仍有錯誤，顯示詳細資訊
     failed = [r for r in results if not r['passed']]
+    has_warnings = any(r.get('warnings') for r in results)
+
     if failed:
         console.print("\n[red]錯誤詳情：[/red]")
         for r in failed:
             console.print(f"  [cyan]{r['project']}[/cyan]")
             for e in r.get('errors', []):
                 console.print(f"    [red]• {e}[/red]")
-        if not fix:
-            console.print("\n[yellow]提示：使用 --fix 自動修復問題[/yellow]")
+
+    # 顯示修復提示
+    if not fix and (failed or has_warnings):
+        console.print("\n[yellow]━━━ 修復提示 ━━━[/yellow]")
+        console.print("[yellow]  dash validate <專案路徑> --fix[/yellow]")
+        console.print("[dim]  自動修復：下拉選單轉圖示按鈕、加入 title 屬性、卡片邊框等[/dim]")
 
 
 @main.command()

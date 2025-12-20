@@ -4,7 +4,7 @@ UI/UX 自動修復器
 修復項目：
 1. 表格內下拉選單 -> 圖示按鈕
 2. 圖示按鈕加入 title 屬性
-3. 移除巢狀選單
+3. 白底卡片加入邊框
 """
 
 import re
@@ -26,6 +26,7 @@ class UxFixer:
 
         self.fix_table_dropdowns()
         self.fix_icon_button_titles()
+        self.fix_card_borders()
 
         return self.fixes
 
@@ -181,3 +182,50 @@ class UxFixer:
 
             except Exception:
                 pass
+
+    def fix_card_borders(self):
+        """為白底卡片加入邊框樣式"""
+        styles_path = self.src_path / 'styles'
+        if not styles_path.exists():
+            return
+
+        # 檢查是否有使用白底卡片
+        has_white_cards = False
+        for js_file in self.src_path.rglob('*.js'):
+            try:
+                content = js_file.read_text(encoding='utf-8')
+                if 'card bg-base-100' in content or 'card" ' in content:
+                    has_white_cards = True
+                    break
+            except Exception:
+                pass
+
+        if not has_white_cards:
+            return
+
+        # 檢查 CSS 是否已有邊框設定
+        main_css = styles_path / 'main.css'
+        if not main_css.exists():
+            return
+
+        try:
+            css_content = main_css.read_text(encoding='utf-8')
+
+            # 如果已有 .card.bg-base-100 邊框設定，跳過
+            if '.card.bg-base-100' in css_content and 'border' in css_content:
+                return
+
+            # 找到卡片區塊並加入邊框樣式
+            card_section = '/* ========================================\n   卡片\n   ======================================== */'
+            if card_section in css_content:
+                new_card_section = f'''{card_section}
+/* 修正 DaisyUI card 在白底上的視覺區分 */
+.card.bg-base-100 {{
+    border: 1px solid var(--border-color);
+}}'''
+                css_content = css_content.replace(card_section, new_card_section)
+                main_css.write_text(css_content, encoding='utf-8')
+                self.fixes.append('src/styles/main.css: 白底卡片加入邊框')
+
+        except Exception:
+            pass
