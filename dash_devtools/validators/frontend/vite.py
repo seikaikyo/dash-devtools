@@ -483,7 +483,18 @@ class ViteValidator:
                         'severity': 'ux'
                     })
 
-                # 4. 白底卡片缺乏視覺區分（DaisyUI card 問題）
+                # 4. Toggle 開關缺少語義色彩
+                # 狀態類開關應該有明確的顏色區分（success/error/warning）
+                toggles = re.findall(r'<input[^>]*class="[^"]*toggle[^"]*"[^>]*>', content)
+                plain_toggles = [t for t in toggles if not any(c in t for c in ['toggle-success', 'toggle-error', 'toggle-warning', 'toggle-info', 'toggle-primary'])]
+                if plain_toggles:
+                    issues.append({
+                        'file': rel_path,
+                        'issue': f'Toggle 開關缺少語義色彩 ({len(plain_toggles)} 個)，建議加入 toggle-success/error 區分狀態',
+                        'severity': 'ux'
+                    })
+
+                # 5. 白底卡片缺乏視覺區分（DaisyUI card 問題）
                 # 偵測 class="card bg-base-100" 但外層 CSS 可能沒有邊框
                 white_cards = len(re.findall(r'class="[^"]*card[^"]*bg-base-100[^"]*"', content))
                 if white_cards > 0:
