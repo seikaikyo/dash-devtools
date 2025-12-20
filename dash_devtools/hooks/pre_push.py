@@ -13,7 +13,10 @@ def run_pre_push_check(project_path):
     issues = []
 
     # 忽略的目錄和檔案
-    ignore_dirs = ['node_modules', '.git', 'dist', 'build', '.next', '__pycache__', 'venv', '.venv']
+    ignore_dirs = [
+        'node_modules', '.git', 'dist', 'build', '.next', '__pycache__',
+        'venv', '.venv', '.angular', '.cache', 'coverage'
+    ]
     ignore_files = ['.env.example', '.env.sample']
 
     # 掃描所有檔案
