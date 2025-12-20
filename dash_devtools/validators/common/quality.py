@@ -163,13 +163,17 @@ class QualityValidator:
 
     def check_emoji_usage(self):
         """檢查程式碼中的 Emoji 使用（應改用 icon font）"""
+        # 精確的 emoji Unicode 範圍（避免誤判中文字）
         emoji_pattern = re.compile(
             "["
-            "\U0001F300-\U0001F9FF"  # 表情符號
-            "\U0001FA00-\U0001FA6F"  # 擴展符號
-            "\U0001FA70-\U0001FAFF"  # 更多擴展
-            "\U00002702-\U000027B0"  # 裝飾符號
-            "\U000024C2-\U0001F251"  # 封閉字符
+            "\U0001F300-\U0001F5FF"  # 雜項符號和象形文字
+            "\U0001F600-\U0001F64F"  # 表情符號
+            "\U0001F680-\U0001F6FF"  # 交通和地圖符號
+            "\U0001F900-\U0001F9FF"  # 補充符號和象形文字
+            "\U0001FA00-\U0001FA6F"  # 棋類符號
+            "\U0001FA70-\U0001FAFF"  # 符號和象形文字擴展-A
+            "\U00002600-\U000026FF"  # 雜項符號
+            "\U00002700-\U000027BF"  # 裝飾符號
             "]+",
             flags=re.UNICODE
         )
@@ -224,6 +228,15 @@ class QualityValidator:
 
     def _is_valid_js_filename(self, name):
         """檢查 JS 檔名是否有效"""
+        # 允許設定檔名（含點號）
+        config_patterns = [
+            'vite.config', 'tailwind.config', 'postcss.config',
+            'eslint.config', 'prettier.config', 'jest.config',
+            'webpack.config', 'rollup.config', 'tsconfig'
+        ]
+        if any(name.startswith(p) for p in config_patterns):
+            return True
+
         # kebab-case
         if re.match(r'^[a-z][a-z0-9-]*$', name):
             return True
