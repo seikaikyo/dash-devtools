@@ -226,6 +226,11 @@ def scan(project):
     console.print("[yellow]🔍 掃描機敏資料...[/yellow]")
     result = run_pre_push_check(project)
 
+    # 顯示使用的掃描引擎
+    engine = result.get('engine', '本地規則')
+    if engine == 'GitGuardian':
+        console.print("[dim]  使用 GitGuardian 引擎[/dim]")
+
     if result['passed']:
         console.print("[green]✓ 安全檢查通過[/green]")
     else:
