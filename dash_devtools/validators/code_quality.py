@@ -6,6 +6,7 @@
 2. 命名規範
 3. 中文註解
 4. 禁止簡體字
+5. 禁止 Emoji（應使用 icon font）
 """
 
 import re
@@ -60,6 +61,7 @@ class CodeQualityValidator:
         self.check_file_length()
         self.check_simplified_chinese()
         self.check_naming_conventions()
+        self.check_emoji_usage()
 
         return self.result
 
@@ -184,3 +186,54 @@ class CodeQualityValidator:
         if re.match(r'^[a-z][a-zA-Z0-9]*$', name):
             return True
         return False
+
+    def check_emoji_usage(self):
+        """檢查程式碼中的 Emoji 使用（應改用 icon font）"""
+        # Emoji Unicode 範圍
+        emoji_pattern = re.compile(
+            "["
+            "\U0001F300-\U0001F9FF"  # 表情符號
+            "\U0001FA00-\U0001FA6F"  # 擴展符號
+            "\U0001FA70-\U0001FAFF"  # 更多擴展
+            "\U00002702-\U000027B0"  # 裝飾符號
+            "\U000024C2-\U0001F251"  # 封閉字符
+            "]+",
+            flags=re.UNICODE
+        )
+
+        issues = []
+
+        for file_path in self._get_source_files():
+            # 只檢查 JS/TS 檔案（不檢查 CSS）
+            if file_path.suffix not in ['.js', '.ts', '.jsx', '.tsx']:
+                continue
+
+            try:
+                content = file_path.read_text(encoding='utf-8')
+                matches = emoji_pattern.findall(content)
+
+                if matches:
+                    # 過濾掉註解中的 emoji
+                    unique_emojis = list(set(matches))[:5]
+                    issues.append({
+                        'file': str(file_path.relative_to(self.project_path)),
+                        'emojis': unique_emojis,
+                        'count': len(matches)
+                    })
+            except Exception:
+                pass
+
+        self.result['checks']['emoji_usage'] = {
+            'count': sum(i['count'] for i in issues) if issues else 0,
+            'files': issues
+        }
+
+        if issues:
+            total = sum(i['count'] for i in issues)
+            self.result['warnings'].append(
+                f"程式碼中使用 Emoji: {total} 個（建議改用 icon font）"
+            )
+            for issue in issues[:3]:
+                self.result['warnings'].append(
+                    f"  {issue['file']}: {''.join(issue['emojis'])}"
+                )
