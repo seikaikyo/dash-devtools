@@ -1,0 +1,171 @@
+"""
+程式碼品質驗證器
+
+檢查項目：
+1. 檔案行數限制 (500 行)
+2. 命名規範
+3. 中文註解
+4. 禁止簡體字
+"""
+
+import re
+from pathlib import Path
+
+
+class CodeQualityValidator:
+    """程式碼品質驗證器"""
+
+    name = 'code_quality'
+
+    # 設定
+    MAX_FILE_LINES = 500
+
+    # 常見簡體字
+    SIMPLIFIED_CHINESE = [
+        '这', '个', '们', '为', '与', '来', '对', '时', '后', '进',
+        '发', '会', '过', '着', '动', '机', '关', '开', '门', '问',
+        '间', '还', '应', '该', '当', '电', '并', '长', '设', '现',
+        '实', '点', '将', '从', '头', '见', '两', '无', '产', '业',
+        '经', '变', '虽', '统', '义', '语', '说', '话', '认', '让',
+        '请', '马', '车', '书', '学', '习', '写', '医', '药', '师'
+    ]
+
+    # 忽略目錄
+    IGNORE_DIRS = ['node_modules', '.git', 'dist', 'build', '.next', '__pycache__']
+
+    def __init__(self, project_path):
+        self.project_path = Path(project_path)
+        self.project_name = self.project_path.name
+        self.result = {
+            'name': self.name,
+            'passed': True,
+            'errors': [],
+            'warnings': [],
+            'checks': {}
+        }
+
+    def run(self):
+        """執行所有驗證"""
+        if not self.project_path.exists():
+            self.result['passed'] = False
+            self.result['errors'].append(f'專案路徑不存在: {self.project_path}')
+            return self.result
+
+        self.check_file_length()
+        self.check_simplified_chinese()
+        self.check_naming_conventions()
+
+        return self.result
+
+    def check_file_length(self):
+        """檢查檔案行數"""
+        large_files = []
+
+        for file_path in self._get_source_files():
+            try:
+                content = file_path.read_text(encoding='utf-8')
+                line_count = len(content.splitlines())
+
+                if line_count > self.MAX_FILE_LINES:
+                    large_files.append({
+                        'file': str(file_path.relative_to(self.project_path)),
+                        'lines': line_count
+                    })
+            except Exception:
+                pass
+
+        self.result['checks']['file_length'] = {
+            'count': len(large_files),
+            'files': large_files
+        }
+
+        if large_files:
+            for f in large_files[:5]:
+                self.result['warnings'].append(
+                    f"檔案過長: {f['file']} ({f['lines']} 行)"
+                )
+
+    def check_simplified_chinese(self):
+        """檢查簡體字"""
+        issues = []
+
+        for file_path in self._get_source_files():
+            try:
+                content = file_path.read_text(encoding='utf-8')
+                found_chars = []
+
+                for char in self.SIMPLIFIED_CHINESE:
+                    if char in content:
+                        found_chars.append(char)
+
+                if found_chars:
+                    issues.append({
+                        'file': str(file_path.relative_to(self.project_path)),
+                        'chars': found_chars[:5]
+                    })
+            except Exception:
+                pass
+
+        self.result['checks']['simplified_chinese'] = {
+            'count': len(issues),
+            'files': issues
+        }
+
+        if issues:
+            for issue in issues[:3]:
+                self.result['errors'].append(
+                    f"發現簡體字在 {issue['file']}: {', '.join(issue['chars'])}"
+                )
+            self.result['passed'] = False
+
+    def check_naming_conventions(self):
+        """檢查命名規範"""
+        issues = []
+
+        for file_path in self._get_source_files():
+            # 檢查檔案名稱
+            name = file_path.stem
+
+            # JS/TS 檔案應該是 kebab-case 或 PascalCase
+            if file_path.suffix in ['.js', '.ts', '.jsx', '.tsx']:
+                if not self._is_valid_js_filename(name):
+                    issues.append({
+                        'file': str(file_path.relative_to(self.project_path)),
+                        'issue': '檔名應為 kebab-case 或 PascalCase'
+                    })
+
+        self.result['checks']['naming'] = {
+            'count': len(issues),
+            'issues': issues
+        }
+
+        if issues:
+            for issue in issues[:3]:
+                self.result['warnings'].append(
+                    f"命名問題: {issue['file']} - {issue['issue']}"
+                )
+
+    def _get_source_files(self):
+        """取得所有原始碼檔案"""
+        extensions = ['*.js', '*.ts', '*.jsx', '*.tsx', '*.py', '*.css', '*.scss']
+        files = []
+
+        for ext in extensions:
+            for f in self.project_path.rglob(ext):
+                if not any(ignore in str(f) for ignore in self.IGNORE_DIRS):
+                    files.append(f)
+
+        return files
+
+    def _is_valid_js_filename(self, name):
+        """檢查 JS 檔名是否有效"""
+        # kebab-case
+        if re.match(r'^[a-z][a-z0-9-]*$', name):
+            return True
+        # PascalCase
+        if re.match(r'^[A-Z][a-zA-Z0-9]*$', name):
+            return True
+        # camelCase
+        if re.match(r'^[a-z][a-zA-Z0-9]*$', name):
+            return True
+        return False

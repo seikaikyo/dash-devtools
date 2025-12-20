@@ -1,0 +1,179 @@
+"""
+安全性驗證器
+
+檢查項目：
+1. API Key / Token 外洩
+2. 密碼硬編碼
+3. .env 檔案提交
+4. 敏感資料暴露
+"""
+
+import re
+from pathlib import Path
+
+
+class SecurityValidator:
+    """安全性驗證器"""
+
+    name = 'security'
+
+    # 敏感資料正則表達式
+    SENSITIVE_PATTERNS = [
+        (r'(?i)(api[_-]?key|apikey)\s*[=:]\s*["\']?[a-zA-Z0-9_-]{20,}', 'API Key'),
+        (r'(?i)(secret|token)\s*[=:]\s*["\']?[a-zA-Z0-9_-]{20,}', 'Secret/Token'),
+        (r'(?i)password\s*[=:]\s*["\'][^"\']+["\']', '密碼'),
+        (r'sk-[a-zA-Z0-9]{48}', 'OpenAI API Key'),
+        (r'sk_live_[a-zA-Z0-9]{24,}', 'Stripe Live Key'),
+        (r'ghp_[a-zA-Z0-9]{36}', 'GitHub Token'),
+        (r'CLERK_[A-Z_]+\s*=\s*["\']?[a-zA-Z0-9_-]{20,}', 'Clerk Key'),
+    ]
+
+    # 敏感檔案
+    SENSITIVE_FILES = [
+        '.env',
+        '.env.local',
+        '.env.production',
+        'credentials.json',
+        'service-account.json',
+        'private.key',
+        '*.pem',
+    ]
+
+    # 忽略目錄
+    IGNORE_DIRS = ['node_modules', '.git', 'dist', 'build', '.next', '__pycache__']
+
+    def __init__(self, project_path):
+        self.project_path = Path(project_path)
+        self.project_name = self.project_path.name
+        self.result = {
+            'name': self.name,
+            'passed': True,
+            'errors': [],
+            'warnings': [],
+            'checks': {}
+        }
+
+    def run(self):
+        """執行所有驗證"""
+        if not self.project_path.exists():
+            self.result['passed'] = False
+            self.result['errors'].append(f'專案路徑不存在: {self.project_path}')
+            return self.result
+
+        self.check_sensitive_files()
+        self.check_hardcoded_secrets()
+        self.check_gitignore()
+
+        return self.result
+
+    def check_sensitive_files(self):
+        """檢查敏感檔案是否被追蹤"""
+        issues = []
+
+        for pattern in self.SENSITIVE_FILES:
+            if '*' in pattern:
+                files = list(self.project_path.rglob(pattern))
+            else:
+                files = [self.project_path / pattern]
+
+            for f in files:
+                if f.exists() and f.is_file():
+                    # 檢查是否在 .gitignore 中
+                    if not self._is_gitignored(f):
+                        issues.append(str(f.relative_to(self.project_path)))
+
+        self.result['checks']['sensitive_files'] = {
+            'count': len(issues),
+            'files': issues
+        }
+
+        if issues:
+            self.result['passed'] = False
+            for f in issues:
+                self.result['errors'].append(f'敏感檔案未忽略: {f}')
+
+    def check_hardcoded_secrets(self):
+        """檢查硬編碼的敏感資料"""
+        issues = []
+
+        for file_path in self._get_source_files():
+            try:
+                content = file_path.read_text(encoding='utf-8')
+                rel_path = str(file_path.relative_to(self.project_path))
+
+                for pattern, desc in self.SENSITIVE_PATTERNS:
+                    matches = re.findall(pattern, content)
+                    if matches:
+                        issues.append({
+                            'file': rel_path,
+                            'type': desc,
+                            'count': len(matches)
+                        })
+            except Exception:
+                pass
+
+        self.result['checks']['hardcoded_secrets'] = {
+            'count': len(issues),
+            'issues': issues
+        }
+
+        if issues:
+            self.result['passed'] = False
+            for issue in issues:
+                self.result['errors'].append(
+                    f"發現 {issue['type']} 在 {issue['file']}"
+                )
+
+    def check_gitignore(self):
+        """檢查 .gitignore 設定"""
+        gitignore = self.project_path / '.gitignore'
+        required_patterns = ['.env', 'node_modules', '*.log']
+        missing = []
+
+        if gitignore.exists():
+            content = gitignore.read_text(encoding='utf-8')
+            for pattern in required_patterns:
+                if pattern not in content:
+                    missing.append(pattern)
+        else:
+            missing = required_patterns
+
+        self.result['checks']['gitignore'] = {
+            'exists': gitignore.exists(),
+            'missing_patterns': missing
+        }
+
+        if missing:
+            for pattern in missing:
+                self.result['warnings'].append(f'.gitignore 缺少: {pattern}')
+
+    def _get_source_files(self):
+        """取得所有原始碼檔案"""
+        extensions = ['*.js', '*.ts', '*.jsx', '*.tsx', '*.py', '*.json', '*.yaml', '*.yml']
+        files = []
+
+        for ext in extensions:
+            for f in self.project_path.rglob(ext):
+                # 跳過忽略目錄
+                if not any(ignore in str(f) for ignore in self.IGNORE_DIRS):
+                    files.append(f)
+
+        return files
+
+    def _is_gitignored(self, file_path):
+        """檢查檔案是否在 .gitignore 中"""
+        gitignore = self.project_path / '.gitignore'
+        if not gitignore.exists():
+            return False
+
+        content = gitignore.read_text(encoding='utf-8')
+        rel_path = str(file_path.relative_to(self.project_path))
+
+        for line in content.splitlines():
+            line = line.strip()
+            if not line or line.startswith('#'):
+                continue
+            if line in rel_path or rel_path.startswith(line):
+                return True
+
+        return False
