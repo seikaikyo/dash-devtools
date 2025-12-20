@@ -7,14 +7,19 @@ from pathlib import Path
 
 
 # 敏感資料正則表達式
+# 注意：要避免假陽性，模式需要精確匹配硬編碼的值，而非變數賦值
 SENSITIVE_PATTERNS = [
-    (r'(?i)(api[_-]?key|apikey)\s*[=:]\s*["\']?[a-zA-Z0-9_-]{20,}', 'API Key'),
-    (r'(?i)(secret|token)\s*[=:]\s*["\']?[a-zA-Z0-9_-]{20,}', 'Secret/Token'),
-    (r'(?i)password\s*[=:]\s*["\'][^"\']+["\']', '密碼'),
+    # API Key: 必須有引號包住的值（排除函數呼叫）
+    (r'(?i)(api[_-]?key|apikey)\s*[=:]\s*["\'][a-zA-Z0-9_-]{20,}["\']', 'API Key'),
+    # Secret/Token: 特定命名且有引號包住的值
+    (r'(?i)(client_?secret|api_?secret|secret_?key)\s*[=:]\s*["\'][a-zA-Z0-9_-]{20,}["\']', 'Secret/Token'),
+    # 密碼: 需要引號且長度 >= 8
+    (r'(?i)password\s*[=:]\s*["\'][^"\']{8,}["\']', '密碼'),
+    # 特定格式的 Key (這些格式明確，不會有假陽性)
     (r'sk-[a-zA-Z0-9]{48}', 'OpenAI API Key'),
     (r'sk_live_[a-zA-Z0-9]{24,}', 'Stripe Live Key'),
     (r'ghp_[a-zA-Z0-9]{36}', 'GitHub Token'),
-    (r'CLERK_[A-Z_]+\s*=\s*["\']?[a-zA-Z0-9_-]{20,}', 'Clerk Key'),
+    (r'CLERK_SECRET_KEY\s*=\s*["\']?sk_[a-zA-Z0-9_-]{20,}', 'Clerk Secret Key'),
     (r'-----BEGIN (RSA )?PRIVATE KEY-----', '私鑰'),
     (r'AKIA[0-9A-Z]{16}', 'AWS Access Key'),
 ]
