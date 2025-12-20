@@ -65,7 +65,7 @@ def validate(project, validate_all, check, fix, output):
     # 如果有錯誤且啟用自動修復
     has_errors = any(not r['passed'] for r in results)
     if fix and has_errors:
-        console.print("\n[yellow]🔧 執行自動修復...[/yellow]")
+        console.print("\n[yellow][FIX] 執行自動修復...[/yellow]")
         fix_results = run_auto_fix(projects)
         for fr in fix_results:
             if fr['fixes']:
