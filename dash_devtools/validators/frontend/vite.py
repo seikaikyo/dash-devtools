@@ -483,6 +483,29 @@ class ViteValidator:
                         'severity': 'ux'
                     })
 
+                # 4. 白底卡片缺乏視覺區分（DaisyUI card 問題）
+                # 偵測 class="card bg-base-100" 但外層 CSS 可能沒有邊框
+                white_cards = len(re.findall(r'class="[^"]*card[^"]*bg-base-100[^"]*"', content))
+                if white_cards > 0:
+                    # 檢查 CSS 是否有處理 .card.bg-base-100 邊框
+                    css_files = list(self.src_path.rglob('*.css'))
+                    has_card_border = False
+                    for css_file in css_files:
+                        try:
+                            css_content = css_file.read_text(encoding='utf-8')
+                            if '.card.bg-base-100' in css_content and 'border' in css_content:
+                                has_card_border = True
+                                break
+                        except Exception:
+                            pass
+
+                    if not has_card_border:
+                        issues.append({
+                            'file': rel_path,
+                            'issue': f'白底卡片 ({white_cards} 個) 缺乏邊框，可能難以辨識',
+                            'severity': 'ui'
+                        })
+
             except Exception:
                 pass
 
@@ -494,7 +517,8 @@ class ViteValidator:
         if issues:
             for issue in issues[:5]:
                 severity = issue.get('severity', 'ux')
-                prefix = '[UX]' if severity == 'ux' else '[A11Y]'
+                prefix_map = {'ux': '[UX]', 'a11y': '[A11Y]', 'ui': '[UI]'}
+                prefix = prefix_map.get(severity, '[UX]')
                 self.result['warnings'].append(f"{prefix} {issue['file']}: {issue['issue']}")
 
     def check_bundle_size(self):
