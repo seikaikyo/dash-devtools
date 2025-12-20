@@ -113,6 +113,25 @@ dash release publish --version 1.2.0 /path/to/project
 - .env 檔案提交
 - 敏感資料暴露
 
+#### GitGuardian 整合
+
+支援 [GitGuardian](https://www.gitguardian.com/) 掃描引擎，與 GitHub 偵測一致：
+
+```bash
+# 安裝 ggshield
+pip install ggshield
+
+# 設定 API Key
+export GITGUARDIAN_API_KEY="your-api-key"
+
+# 掃描會自動使用 GitGuardian（如果有設定）
+dash scan /path/to/project
+```
+
+掃描優先順序：
+1. **GitGuardian** - 如果有 API Key 且安裝了 ggshield
+2. **本地規則** - 備援，使用內建正則表達式
+
 ### 程式碼品質 (`code_quality`)
 
 - 檔案行數限制 (500 行)
@@ -129,8 +148,36 @@ dash hooks install /path/to/project
 ```
 
 Push 前會自動執行：
-1. 掃描機敏資料
+1. 掃描機敏資料 (GitGuardian 或本地規則)
 2. 驗證專案規範
+
+## 模板
+
+位於 `templates/` 目錄：
+
+| 模板 | 說明 |
+|------|------|
+| `ios-theme.css` | iOS/macOS 風格 DaisyUI 主題 |
+| `deploy-netlify.yml` | GitHub Actions Netlify 備援部署 |
+
+### iOS 主題使用
+
+```bash
+# 複製到專案
+cp templates/ios-theme.css /path/to/project/src/styles/
+
+# 在 main.css 引入
+@import "./ios-theme.css";
+
+# HTML 使用主題
+<html data-theme="ios">
+```
+
+包含元件：
+- `.ios-glass` - 毛玻璃效果
+- `.ios-card` - iOS 風格卡片
+- `.ios-list` - iOS 列表
+- `.ios-navbar` / `.ios-tabbar` - 導航元件
 
 ---
 
