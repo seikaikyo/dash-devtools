@@ -1,15 +1,82 @@
 """
 Pre-push 檢查
+
+支援 GitGuardian (ggshield) 整合：
+- 如果有設定 GITGUARDIAN_API_KEY 且安裝了 ggshield，使用 GitGuardian 掃描
+- 否則使用本地正則表達式掃描
 """
 
 from .pre_commit import run_pre_commit_check, SENSITIVE_PATTERNS
 import re
+import os
+import subprocess
 from pathlib import Path
+
+
+def run_ggshield_scan(project_path):
+    """使用 GitGuardian ggshield 掃描"""
+    try:
+        # 檢查是否有 API Key
+        if not os.environ.get('GITGUARDIAN_API_KEY'):
+            return None
+
+        # 檢查 ggshield 是否安裝
+        result = subprocess.run(
+            ['ggshield', '--version'],
+            capture_output=True,
+            text=True
+        )
+        if result.returncode != 0:
+            return None
+
+        # 執行掃描
+        result = subprocess.run(
+            ['ggshield', 'secret', 'scan', 'path', str(project_path),
+             '--recursive', '--exit-zero', '--json'],
+            capture_output=True,
+            text=True,
+            cwd=project_path
+        )
+
+        # 解析結果
+        import json
+        try:
+            data = json.loads(result.stdout)
+            issues = []
+
+            # ggshield 輸出格式
+            if 'entities_with_incidents' in data:
+                for entity in data.get('entities_with_incidents', []):
+                    filename = entity.get('filename', 'unknown')
+                    for incident in entity.get('incidents', []):
+                        issues.append({
+                            'file': filename,
+                            'type': incident.get('type', 'Secret'),
+                            'count': 1
+                        })
+
+            return {
+                'passed': len(issues) == 0,
+                'issues': issues,
+                'engine': 'GitGuardian'
+            }
+        except json.JSONDecodeError:
+            return None
+
+    except Exception:
+        return None
 
 
 def run_pre_push_check(project_path):
     """執行 pre-push 檢查 (掃描整個專案)"""
     project = Path(project_path)
+
+    # 優先使用 GitGuardian
+    gg_result = run_ggshield_scan(project_path)
+    if gg_result is not None:
+        return gg_result
+
+    # 備援：使用本地正則表達式
     issues = []
 
     # 忽略的目錄和檔案
