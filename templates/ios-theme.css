@@ -171,6 +171,7 @@
 
 /* ================================
    iOS Toggle 開關
+   iOS 規範：ON=綠色、OFF=灰色
    ================================ */
 [data-theme="ios"] .toggle {
   --tglbg: #E5E5EA;
@@ -185,10 +186,11 @@
   border-color: #34C759;
 }
 
-[data-theme="ios"] .toggle-error:checked {
-  --tglbg: #FF3B30;
-  background: #FF3B30;
-  border-color: #FF3B30;
+/* 移除紅色樣式，iOS 不使用紅色開關 */
+[data-theme="ios"] .toggle-success:checked {
+  --tglbg: #34C759;
+  background: #34C759;
+  border-color: #34C759;
 }
 
 /* ================================

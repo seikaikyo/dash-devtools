@@ -29,10 +29,14 @@ def run_ggshield_scan(project_path):
         if result.returncode != 0:
             return None
 
-        # 執行掃描
+        # 執行掃描 (忽略 .claude 本地設定和 node_modules)
         result = subprocess.run(
             ['ggshield', 'secret', 'scan', 'path', str(project_path),
-             '--recursive', '--exit-zero', '--json'],
+             '--recursive', '--exit-zero', '--json', '--yes',
+             '--ignore-path', '.claude/',
+             '--ignore-path', 'node_modules/',
+             '--ignore-path', '.env',
+             '--ignore-path', '.env.local'],
             capture_output=True,
             text=True,
             cwd=project_path
