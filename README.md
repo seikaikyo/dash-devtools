@@ -348,17 +348,20 @@ cat file | claude -p "問題"    # 管道輸入
 
 | 專案 | 類型 | 說明 |
 |------|------|------|
-| MES | Angular + PrimeNG | 製造執行系統 |
-| SSO | Vite + DaisyUI | 單一登入系統 |
-| EAP | Vite + DaisyUI | 設備自動化程式 |
-| VAC | Vite + DaisyUI | 休假管理系統 |
-| RFID | Vite + DaisyUI | RFID 標籤管理 |
-| MCS | Vite + DaisyUI | 物料管控系統 |
-| MIDS | Vite + DaisyUI | 物料識別系統 |
-| GHG | Vite + DaisyUI | 碳排管理系統 |
-| BPM | Vite + DaisyUI | 流程管理系統 |
-| RMS | Vite + DaisyUI | 資源管理系統 |
-| VisionAI | Python | AI 視覺分析 |
+| MES 製造執行 | Angular + PrimeNG | 再生廠製造執行系統 |
+| SSO 管理後台 | Vite + DaisyUI | 用戶與權限管理 |
+| MSW 戰情室 | Vite + DaisyUI | 製程管理系統 |
+| EAP 設備自動化 | Vite + DaisyUI | 設備自動化平台 |
+| VAC 承攬商門禁 | Vite + DaisyUI | 承攬商門禁管理系統 |
+| RFID 追蹤 | Vite + DaisyUI | RFID 標籤追蹤系統 |
+| MCS 物料控制 | Vite + DaisyUI | 物料控制系統 |
+| MIDS 材料追蹤 | Vite + DaisyUI | 材料識別與追蹤系統 |
+| GHG 碳排管理 | Vite + DaisyUI | 溫室氣體排放管理系統 |
+| BPM 簽核流程 | Vite + DaisyUI | 簽核流程管理系統 |
+| RMS 配方管理 | Vite + DaisyUI | 配方管理系統 |
+| 8D 問題管理 | Vite + DaisyUI | 8D 問題解決流程管理 |
+| Vision AI | Python | AI 影像辨識系統 |
+| API Center | Vite + Shoelace | API 管理中心與開發文件 |
 
 ## 開發
 
