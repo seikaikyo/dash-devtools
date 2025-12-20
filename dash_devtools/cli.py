@@ -183,5 +183,44 @@ def vision(image, output):
     console.print(result)
 
 
+@main.command()
+@click.argument('project', type=click.Path(exists=True), default='.')
+def scan(project):
+    """掃描機敏資料"""
+    from .hooks import run_pre_push_check
+
+    console.print("[yellow]🔍 掃描機敏資料...[/yellow]")
+    result = run_pre_push_check(project)
+
+    if result['passed']:
+        console.print("[green]✓ 安全檢查通過[/green]")
+    else:
+        console.print("[red]✗ 發現機敏資料！[/red]")
+        for issue in result['issues']:
+            console.print(f"  [red]• {issue['file']}: {issue['type']}[/red]")
+        raise SystemExit(1)
+
+
+@main.group()
+def hooks():
+    """Git Hooks 管理"""
+    pass
+
+
+@hooks.command()
+@click.argument('project', type=click.Path(exists=True), default='.')
+def install(project):
+    """安裝 Git Hooks 到專案"""
+    from .hooks import install_hooks
+
+    result = install_hooks(project)
+
+    if result['success']:
+        console.print("[green]✓ Git Hooks 已安裝[/green]")
+        console.print("  已安裝：pre-commit, pre-push")
+    else:
+        console.print(f"[red]✗ 安裝失敗: {result.get('error')}[/red]")
+
+
 if __name__ == '__main__':
     main()
