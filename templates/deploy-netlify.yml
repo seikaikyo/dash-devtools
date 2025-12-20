@@ -1,0 +1,49 @@
+# Netlify 備援部署模板
+# 複製此檔案到專案的 .github/workflows/deploy-netlify.yml
+#
+# 需要設定 Repository Secrets:
+#   NETLIFY_AUTH_TOKEN: Netlify Personal Access Token
+#   NETLIFY_SITE_ID: Netlify Site ID
+#
+# 設定步驟:
+# 1. 前往 https://app.netlify.com 建立新網站
+# 2. 取得 Site ID (Site settings > General > Site ID)
+# 3. 取得 Token (User settings > Applications > Personal access tokens)
+# 4. 在 GitHub repo 設定 Secrets (Settings > Secrets and variables > Actions)
+
+name: Deploy to Netlify
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Deploy to Netlify
+        uses: nwtgck/actions-netlify@v3
+        with:
+          publish-dir: './dist'
+          production-deploy: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          deploy-message: "Deploy from GitHub Actions - ${{ github.sha }}"
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
