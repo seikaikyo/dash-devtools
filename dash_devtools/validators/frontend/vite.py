@@ -54,6 +54,7 @@ class ViteValidator:
         self.check_table_structure()
         self.check_dropdown_structure()
         self.check_form_structure()
+        self.check_ux_patterns()
         self.check_bundle_size()
 
         return self.result
@@ -437,6 +438,64 @@ class ViteValidator:
         if issues:
             for issue in issues[:5]:
                 self.result['warnings'].append(f"{issue['file']}: {issue['issue']}")
+
+    def check_ux_patterns(self):
+        """檢查 UI/UX 模式"""
+        if not self.src_path.exists():
+            return
+
+        issues = []
+
+        for file_path in self.src_path.rglob('*.js'):
+            if self._should_skip(file_path):
+                continue
+            try:
+                content = file_path.read_text(encoding='utf-8')
+                rel_path = str(file_path.relative_to(self.project_path))
+
+                # 1. 表格內的下拉選單操作（建議改用圖示按鈕）
+                # 偵測: <td> 內有 dropdown
+                if '<td>' in content or '<td ' in content:
+                    td_dropdown = len(re.findall(r'<td[^>]*>[\s\S]*?dropdown[\s\S]*?</td>', content))
+                    if td_dropdown > 0:
+                        issues.append({
+                            'file': rel_path,
+                            'issue': f'表格內使用下拉選單 ({td_dropdown} 處)，建議改用圖示按鈕',
+                            'severity': 'ux'
+                        })
+
+                # 2. 缺少 title 屬性的圖示按鈕
+                icon_buttons = re.findall(r'<button[^>]*class="[^"]*btn[^"]*"[^>]*>[\s]*<i[^>]*></i>[\s]*</button>', content)
+                buttons_without_title = [b for b in icon_buttons if 'title=' not in b]
+                if buttons_without_title:
+                    issues.append({
+                        'file': rel_path,
+                        'issue': f'圖示按鈕缺少 title 屬性 ({len(buttons_without_title)} 個)',
+                        'severity': 'a11y'
+                    })
+
+                # 3. 巢狀過深的選單（超過 2 層）
+                nested_menus = len(re.findall(r'dropdown-content[\s\S]*?dropdown-content', content))
+                if nested_menus > 0:
+                    issues.append({
+                        'file': rel_path,
+                        'issue': '發現巢狀選單，可能影響使用體驗',
+                        'severity': 'ux'
+                    })
+
+            except Exception:
+                pass
+
+        self.result['checks']['ux_patterns'] = {
+            'count': len(issues),
+            'issues': issues
+        }
+
+        if issues:
+            for issue in issues[:5]:
+                severity = issue.get('severity', 'ux')
+                prefix = '[UX]' if severity == 'ux' else '[A11Y]'
+                self.result['warnings'].append(f"{prefix} {issue['file']}: {issue['issue']}")
 
     def check_bundle_size(self):
         """檢查 Bundle 大小"""
