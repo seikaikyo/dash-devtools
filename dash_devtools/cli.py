@@ -261,5 +261,58 @@ def install(project):
         console.print(f"[red]✗ 安裝失敗: {result.get('error')}[/red]")
 
 
+@main.command()
+@click.argument('project', type=click.Path(exists=True), default='.')
+@click.option('--copy', 'do_copy', is_flag=True, help='複製連結到剪貼簿')
+@click.option('--open', 'do_open', is_flag=True, help='在瀏覽器開啟')
+@click.option('--save', is_flag=True, help='儲存連結到 docs/dbdiagram-link.txt')
+def dbdiagram(project, do_copy, do_open, save):
+    """產生 dbdiagram.io 資料庫圖表連結
+
+    從 Prisma schema 或 DBML 檔案產生可分享的連結。
+
+    使用範例：
+      dash dbdiagram /path/to/project
+      dash dbdiagram . --open
+      dash dbdiagram . --copy
+    """
+    from .dbdiagram import generate_dbdiagram_link, save_link_to_file
+
+    console.print("[yellow]📊 產生 dbdiagram.io 連結...[/yellow]")
+
+    result = generate_dbdiagram_link(project)
+
+    if not result['success']:
+        console.print(f"[red]✗ {result['error']}[/red]")
+        raise SystemExit(1)
+
+    link = result['link']
+    console.print(f"[green]✓ 連結已產生[/green]")
+    console.print(f"[dim]  來源: {result.get('dbml_path', 'N/A')}[/dim]")
+    console.print("")
+    console.print(f"[cyan]連結: {link[:80]}...[/cyan]")
+
+    if save:
+        output_path = save_link_to_file(project, link)
+        console.print(f"[green]✓ 已儲存至 {output_path}[/green]")
+
+    if do_copy:
+        try:
+            import subprocess
+            subprocess.run(['pbcopy'], input=link.encode(), check=True)
+            console.print("[green]✓ 已複製到剪貼簿[/green]")
+        except Exception:
+            console.print("[yellow]無法複製到剪貼簿，請手動複製[/yellow]")
+            console.print(link)
+
+    if do_open:
+        try:
+            import webbrowser
+            webbrowser.open(link)
+            console.print("[green]✓ 已在瀏覽器開啟[/green]")
+        except Exception:
+            console.print("[yellow]無法開啟瀏覽器[/yellow]")
+
+
 if __name__ == '__main__':
     main()

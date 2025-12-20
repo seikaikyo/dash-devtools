@@ -19,6 +19,7 @@ pip install -e .
 | **發布** | `dash release` | 版本管理、發布流程 |
 | **視覺** | `dash vision` | AI 視覺分析工具 |
 | **掃描** | `dash scan` | 掃描機敏資料 |
+| **圖表** | `dash dbdiagram` | 產生資料庫 ERD 連結 |
 
 ## 快速使用
 
@@ -131,6 +132,46 @@ dash scan /path/to/project
 掃描優先順序：
 1. **GitGuardian** - 如果有 API Key 且安裝了 ggshield
 2. **本地規則** - 備援，使用內建正則表達式
+
+### 資料庫圖表
+
+從 Prisma schema 自動產生 [dbdiagram.io](https://dbdiagram.io) 可分享連結：
+
+```bash
+# 產生連結
+dash dbdiagram /path/to/project
+
+# 開啟瀏覽器
+dash dbdiagram . --open
+
+# 複製到剪貼簿
+dash dbdiagram . --copy
+
+# 儲存到檔案
+dash dbdiagram . --save
+```
+
+#### Prisma 設定
+
+在 `schema.prisma` 加入：
+
+```prisma
+generator dbml {
+  provider   = "prisma-dbml-generator"
+  output     = "../docs"
+  outputName = "schema.dbml"
+}
+```
+
+安裝套件：
+
+```bash
+npm install -D prisma-dbml-generator
+```
+
+執行 `npx prisma generate` 後會產生 DBML 檔案，`dash dbdiagram` 會自動編碼為可分享連結。
+
+**注意**：dbdiagram.io 的 DBML-in-Link 功能完全免費，不需要帳號也不需要 API Key
 
 ### 程式碼品質 (`code_quality`)
 
