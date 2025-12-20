@@ -143,6 +143,14 @@ class MigrationValidator:
 
     def check_tailwind_config(self):
         """檢查 Tailwind 設定"""
+        # Angular 專案使用自己的建構系統，跳過此檢查
+        angular_json = self.project_path / 'angular.json'
+        if angular_json.exists():
+            self.result['checks']['tailwind_config'] = {
+                'skipped': 'Angular 專案'
+            }
+            return
+
         vite_config = self.project_path / 'vite.config.js'
 
         if not vite_config.exists():
@@ -171,6 +179,10 @@ class MigrationValidator:
         if not pkg_path.exists():
             return
 
+        # 判斷是否為 Angular 專案
+        angular_json = self.project_path / 'angular.json'
+        is_angular = angular_json.exists()
+
         try:
             pkg = json.loads(pkg_path.read_text(encoding='utf-8'))
             deps = {**pkg.get('dependencies', {}), **pkg.get('devDependencies', {})}
@@ -184,10 +196,12 @@ class MigrationValidator:
                 'has_tailwind': has_tailwind,
                 'has_daisyui': has_daisyui,
                 'has_vite_plugin': has_vite_plugin,
-                'has_shoelace': has_shoelace
+                'has_shoelace': has_shoelace,
+                'is_angular': is_angular
             }
 
-            if not has_vite_plugin:
+            # Angular 專案不需要 @tailwindcss/vite
+            if not is_angular and not has_vite_plugin:
                 self.result['passed'] = False
                 self.result['errors'].append('缺少 @tailwindcss/vite')
 

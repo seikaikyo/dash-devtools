@@ -25,7 +25,8 @@ class SecurityValidator:
         (r'sk-[a-zA-Z0-9]{48}', 'OpenAI API Key'),
         (r'sk_live_[a-zA-Z0-9]{24,}', 'Stripe Live Key'),
         (r'ghp_[a-zA-Z0-9]{36}', 'GitHub Token'),
-        (r'CLERK_[A-Z_]+\s*=\s*["\']?[a-zA-Z0-9_-]{20,}', 'Clerk Key'),
+        # Clerk 只檢查 secret key (sk_)，publishable key (pk_) 是公開的
+        (r'CLERK_SECRET_KEY\s*=\s*["\']?sk_[a-zA-Z0-9_-]{20,}', 'Clerk Secret Key'),
     ]
 
     # 敏感檔案
@@ -40,7 +41,10 @@ class SecurityValidator:
     ]
 
     # 忽略目錄
-    IGNORE_DIRS = ['node_modules', '.git', 'dist', 'build', '.next', '__pycache__']
+    IGNORE_DIRS = [
+        'node_modules', '.git', 'dist', 'build', '.next', '__pycache__',
+        '.angular', 'venv', '.venv', '.cache', 'coverage'
+    ]
 
     def __init__(self, project_path):
         self.project_path = Path(project_path)
@@ -70,6 +74,12 @@ class SecurityValidator:
         """檢查敏感檔案是否被追蹤"""
         issues = []
 
+        # 找出所有巢狀的 git repo (要跳過)
+        nested_repos = []
+        for git_dir in self.project_path.rglob('.git'):
+            if git_dir.parent != self.project_path:
+                nested_repos.append(str(git_dir.parent))
+
         for pattern in self.SENSITIVE_FILES:
             if '*' in pattern:
                 files = list(self.project_path.rglob(pattern))
@@ -78,6 +88,12 @@ class SecurityValidator:
 
             for f in files:
                 if f.exists() and f.is_file():
+                    # 跳過巢狀 git repo
+                    if any(str(f).startswith(repo) for repo in nested_repos):
+                        continue
+                    # 跳過忽略目錄
+                    if any(ignore in str(f) for ignore in self.IGNORE_DIRS):
+                        continue
                     # 檢查是否在 .gitignore 中
                     if not self._is_gitignored(f):
                         issues.append(str(f.relative_to(self.project_path)))
@@ -152,11 +168,21 @@ class SecurityValidator:
         extensions = ['*.js', '*.ts', '*.jsx', '*.tsx', '*.py', '*.json', '*.yaml', '*.yml']
         files = []
 
+        # 找出所有巢狀的 git repo (要跳過)
+        nested_repos = []
+        for git_dir in self.project_path.rglob('.git'):
+            if git_dir.parent != self.project_path:
+                nested_repos.append(str(git_dir.parent))
+
         for ext in extensions:
             for f in self.project_path.rglob(ext):
                 # 跳過忽略目錄
-                if not any(ignore in str(f) for ignore in self.IGNORE_DIRS):
-                    files.append(f)
+                if any(ignore in str(f) for ignore in self.IGNORE_DIRS):
+                    continue
+                # 跳過巢狀 git repo
+                if any(str(f).startswith(repo) for repo in nested_repos):
+                    continue
+                files.append(f)
 
         return files
 

@@ -31,7 +31,13 @@ class CodeQualityValidator:
     ]
 
     # 忽略目錄
-    IGNORE_DIRS = ['node_modules', '.git', 'dist', 'build', '.next', '__pycache__']
+    IGNORE_DIRS = [
+        'node_modules', '.git', 'dist', 'build', '.next', '__pycache__',
+        '.angular', 'venv', '.venv', '.cache', 'coverage'
+    ]
+
+    # 日文專案（允許使用日文漢字）
+    JAPANESE_PROJECTS = ['jinkochino']
 
     def __init__(self, project_path):
         self.project_path = Path(project_path)
@@ -87,6 +93,15 @@ class CodeQualityValidator:
 
     def check_simplified_chinese(self):
         """檢查簡體字"""
+        # 跳過日文專案
+        if self.project_name in self.JAPANESE_PROJECTS:
+            self.result['checks']['simplified_chinese'] = {
+                'count': 0,
+                'files': [],
+                'skipped': '日文專案'
+            }
+            return
+
         issues = []
 
         for file_path in self._get_source_files():
