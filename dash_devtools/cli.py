@@ -45,10 +45,12 @@ def main():
 @click.option('--all', 'validate_all', is_flag=True, help='驗證所有專案')
 @click.option('--check', type=click.Choice(['security', 'migration', 'performance', 'code_quality', 'all']),
               default='all', help='指定檢查項目')
+@click.option('--fix', is_flag=True, help='自動修復發現的問題')
 @click.option('--output', '-o', type=click.Path(), help='輸出報告路徑')
-def validate(project, validate_all, check, output):
+def validate(project, validate_all, check, fix, output):
     """驗證專案符合開發規範"""
     from .validators import run_validation
+    from .fixers import run_auto_fix
 
     if validate_all:
         projects = DEFAULT_PROJECTS
@@ -59,6 +61,21 @@ def validate(project, validate_all, check, output):
         return
 
     results = run_validation(projects, checks=check, output=output)
+
+    # 如果有錯誤且啟用自動修復
+    has_errors = any(not r['passed'] for r in results)
+    if fix and has_errors:
+        console.print("\n[yellow]🔧 執行自動修復...[/yellow]")
+        fix_results = run_auto_fix(projects)
+        for fr in fix_results:
+            if fr['fixes']:
+                console.print(f"  [green]✓[/green] {fr['project']}: 修復 {len(fr['fixes'])} 個問題")
+                for f in fr['fixes']:
+                    console.print(f"    • {f}")
+
+        # 重新驗證
+        console.print("\n[cyan]重新驗證...[/cyan]")
+        results = run_validation(projects, checks=check, output=output)
 
     # 顯示結果表格
     table = Table(title="驗證結果")
@@ -77,6 +94,17 @@ def validate(project, validate_all, check, output):
         )
 
     console.print(table)
+
+    # 如果仍有錯誤，顯示詳細資訊
+    failed = [r for r in results if not r['passed']]
+    if failed:
+        console.print("\n[red]錯誤詳情：[/red]")
+        for r in failed:
+            console.print(f"  [cyan]{r['project']}[/cyan]")
+            for e in r.get('errors', []):
+                console.print(f"    [red]• {e}[/red]")
+        if not fix:
+            console.print("\n[yellow]提示：使用 --fix 自動修復問題[/yellow]")
 
 
 @main.command()
