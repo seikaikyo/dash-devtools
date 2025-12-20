@@ -17,10 +17,38 @@ def run_pre_push_check(project_path):
         'node_modules', '.git', 'dist', 'build', '.next', '__pycache__',
         'venv', '.venv', '.angular', '.cache', 'coverage'
     ]
-    ignore_files = ['.env.example', '.env.sample']
+    ignore_files = ['.env.example', '.env.sample', '.env.template']
 
-    # 掃描所有檔案
-    extensions = ['*.js', '*.ts', '*.jsx', '*.tsx', '*.py', '*.json', '*.yaml', '*.yml', '*.env', '*.env.*']
+    # 讀取 .gitignore 檔案
+    gitignore_patterns = []
+    gitignore_file = project / '.gitignore'
+    if gitignore_file.exists():
+        try:
+            for line in gitignore_file.read_text().splitlines():
+                line = line.strip()
+                if line and not line.startswith('#'):
+                    gitignore_patterns.append(line)
+        except Exception:
+            pass
+
+    def is_gitignored(file_path):
+        """檢查檔案是否在 .gitignore 中"""
+        rel_path = str(file_path.relative_to(project))
+        file_name = file_path.name
+        for pattern in gitignore_patterns:
+            # 簡單匹配：完全匹配或 pattern 在路徑中
+            if pattern == file_name or pattern == rel_path:
+                return True
+            if pattern.startswith('*.') and file_name.endswith(pattern[1:]):
+                return True
+            if pattern.endswith('/') and pattern[:-1] in rel_path.split('/'):
+                return True
+            if pattern in rel_path:
+                return True
+        return False
+
+    # 掃描所有檔案（不含 .env，因為應該都在 .gitignore）
+    extensions = ['*.js', '*.ts', '*.jsx', '*.tsx', '*.py', '*.json', '*.yaml', '*.yml']
 
     for ext in extensions:
         for file_path in project.rglob(ext):
@@ -29,6 +57,9 @@ def run_pre_push_check(project_path):
                 continue
             # 跳過範例檔案
             if file_path.name in ignore_files:
+                continue
+            # 跳過 .gitignore 中的檔案
+            if is_gitignored(file_path):
                 continue
 
             try:
