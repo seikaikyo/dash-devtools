@@ -34,9 +34,15 @@ DEFAULT_PROJECTS = [
 
 
 @click.group()
-@click.version_option(version="1.0.0")
+@click.version_option(version="2.0.0")
 def main():
-    """DashAI DevTools - 大許開發工具集"""
+    """DashAI DevTools v2 - 大許開發工具集
+
+    新功能：
+      health  專案健康評分
+      stats   程式碼統計
+      watch   即時監控
+    """
     pass
 
 
@@ -312,6 +318,181 @@ def dbdiagram(project, do_copy, do_open, save):
             console.print("[green]✓ 已在瀏覽器開啟[/green]")
         except Exception:
             console.print("[yellow]無法開啟瀏覽器[/yellow]")
+
+
+# ============================================================
+# 新功能 v2.0
+# ============================================================
+
+@main.command()
+@click.argument('project', type=click.Path(exists=True), default='.')
+@click.option('--all', 'check_all', is_flag=True, help='檢查所有專案')
+@click.option('--json', 'output_json', is_flag=True, help='輸出 JSON 格式')
+def health(project, check_all, output_json):
+    """專案健康評分
+
+    類似 Lighthouse 的評分機制，量化專案品質：
+    - 安全性: 機敏資料、依賴漏洞
+    - 品質: 程式碼規範、檔案結構
+    - 維護性: 技術債務、文件完整度
+    - 效能: Bundle 大小、依賴數量
+
+    使用範例：
+      dash health .
+      dash health /path/to/project
+      dash health --all
+    """
+    from .health import run_health_check, HealthChecker
+    import json as json_module
+
+    if check_all:
+        projects = DEFAULT_PROJECTS
+    else:
+        projects = [project]
+
+    results = []
+    for p in projects:
+        try:
+            if output_json:
+                checker = HealthChecker(p)
+                scores = checker.check_all()
+                total = sum(s.score for s in scores.values()) // len(scores)
+                results.append({
+                    'project': checker.project_name,
+                    'total_score': total,
+                    'scores': {k: v.score for k, v in scores.items()}
+                })
+            else:
+                result = run_health_check(p)
+                results.append(result)
+        except Exception as e:
+            console.print(f"[red]錯誤: {p} - {e}[/red]")
+
+    if output_json:
+        console.print(json_module.dumps(results, indent=2, ensure_ascii=False))
+
+
+@main.command()
+@click.argument('project', type=click.Path(exists=True), default='.')
+@click.option('--all', 'stats_all', is_flag=True, help='統計所有專案並比較')
+def stats(project, stats_all):
+    """程式碼統計
+
+    視覺化專案統計資訊：
+    - 語言分佈
+    - 檔案數量與行數
+    - 最大檔案排行
+    - 複雜度警告
+
+    使用範例：
+      dash stats .
+      dash stats /path/to/project
+      dash stats --all
+    """
+    from .stats import run_stats, run_stats_all
+
+    if stats_all:
+        run_stats_all(DEFAULT_PROJECTS)
+    else:
+        run_stats(project)
+
+
+@main.command('init-test')
+@click.argument('project', type=click.Path(exists=True), default='.')
+@click.option('--e2e', is_flag=True, help='同時設定 Playwright E2E 測試')
+def init_test(project, e2e):
+    """初始化測試框架
+
+    自動偵測專案類型並設定適合的測試框架：
+    - Vite 專案 → Vitest
+    - Angular 專案 → Jest
+    - 可選 Playwright E2E
+
+    使用範例：
+      dash init-test .
+      dash init-test . --e2e
+    """
+    from .init_test import run_init_test
+
+    run_init_test(project, include_e2e=e2e)
+
+
+@main.command()
+@click.argument('project', type=click.Path(exists=True), default='.')
+@click.option('--all', 'test_all', is_flag=True, help='測試所有專案')
+@click.option('--coverage', '-c', is_flag=True, help='產生覆蓋率報告')
+@click.option('--verbose', '-v', is_flag=True, help='詳細輸出')
+def test(project, test_all, coverage, verbose):
+    """執行專案測試
+
+    自動偵測測試框架並執行：
+    - pytest (Python)
+    - vitest/jest (JavaScript/TypeScript)
+    - karma (Angular)
+
+    使用範例：
+      dash test .
+      dash test . --coverage
+      dash test --all
+    """
+    from .testing import run_test, run_test_all
+
+    if test_all:
+        run_test_all(DEFAULT_PROJECTS, coverage=coverage)
+    else:
+        run_test(project, coverage=coverage, verbose=verbose)
+
+
+@main.command()
+@click.argument('project', type=click.Path(exists=True), default='.')
+@click.option('--test/--no-test', 'include_test', default=True, help='是否執行測試')
+@click.option('--screenshot', '-s', is_flag=True, help='擷取 UI 截圖')
+@click.option('--url', '-u', multiple=True, help='截圖的 URL (可多個)')
+@click.option('--open/--no-open', 'open_browser', default=True, help='是否開啟瀏覽器')
+def report(project, include_test, screenshot, url, open_browser):
+    """產生完整專案報告
+
+    整合健康評分、程式碼統計、測試結果、UI 截圖，
+    產生專業的 HTML 報告。
+
+    使用範例：
+      dash report .
+      dash report . --screenshot
+      dash report . --screenshot -u http://localhost:3000
+      dash report . --no-test
+    """
+    from .report import run_report
+
+    urls = list(url) if url else None
+    run_report(
+        project,
+        include_tests=include_test,
+        include_screenshots=screenshot,
+        urls=urls,
+        open_browser=open_browser
+    )
+
+
+@main.command()
+@click.argument('project', type=click.Path(exists=True), default='.')
+@click.option('--fix', 'auto_fix', is_flag=True, help='發現問題自動修復')
+@click.option('--interval', '-i', type=float, default=1.0, help='檢查間隔(秒)')
+def watch(project, auto_fix, interval):
+    """即時監控模式
+
+    監控檔案變更並自動執行驗證：
+    - 檔案儲存時自動驗證
+    - 即時顯示問題
+    - 可選自動修復
+
+    使用範例：
+      dash watch .
+      dash watch /path/to/project
+      dash watch . --fix
+    """
+    from .watch import run_watch
+
+    run_watch(project, auto_fix=auto_fix, interval=interval)
 
 
 if __name__ == '__main__':
