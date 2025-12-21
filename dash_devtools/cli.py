@@ -110,7 +110,7 @@ def validate(project, validate_all, check, fix, output):
     if not fix and (failed or has_warnings):
         console.print("\n[yellow]━━━ 修復提示 ━━━[/yellow]")
         console.print("[yellow]  dash validate <專案路徑> --fix[/yellow]")
-        console.print("[dim]  自動修復：下拉選單轉圖示按鈕、加入 title 屬性、卡片邊框等[/dim]")
+        console.print("[dim]  自動修復：HTML 標籤修復、sl-icon-button label 屬性等[/dim]")
 
 
 @main.command()
