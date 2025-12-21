@@ -4,7 +4,7 @@
 新架構：依專案類型自動選擇驗證器
 
 - common: 通用驗證（安全、品質）- 所有專案
-- frontend/vite: Vite + Tailwind + DaisyUI
+- frontend/vite: Vite + Shoelace
 - frontend/angular: Angular + PrimeNG
 - backend/nodejs: Node.js API
 - backend/python: Python 後端/AI

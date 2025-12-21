@@ -14,7 +14,7 @@ pip install -e .
 | 分類 | 指令 | 用途 |
 |------|------|------|
 | **驗證** | `dash validate` | 驗證專案符合開發規範 |
-| **遷移** | `dash migrate` | UI 框架遷移 |
+| **遷移** | `dash migrate` | UI 框架遷移（已暫停） |
 | **文件** | `dash docs` | 產生文件、CLAUDE.md |
 | **發布** | `dash release` | 版本管理、發布流程 |
 | **視覺** | `dash vision` | AI 視覺分析工具 |
@@ -49,19 +49,16 @@ dash validate --check smart /path/to/project
 | 表格內下拉選單 | 轉換為圖示按鈕 |
 | 圖示按鈕缺少 title | 自動加入 title 屬性 |
 | 白底卡片缺邊框 | 加入 CSS 邊框樣式 |
-| Shoelace 殘留標籤 | 轉換為 DaisyUI |
+| Emoji 圖示 | 建議改用 sl-icon |
 
-### 遷移 UI 框架
+### 遷移 UI 框架（已暫停）
+
+> **注意**：自動遷移功能已暫停使用。
+> UI 框架遷移需要完整理解設計邏輯後手動進行，避免破壞現有 UI/UX。
 
 ```bash
-# 預覽模式 (不實際修改)
-dash migrate --dry-run /path/to/project
-
-# 執行遷移
+# 此指令目前會返回錯誤訊息
 dash migrate /path/to/project
-
-# 指定來源/目標框架
-dash migrate --from shoelace --to daisyui /path/to/project
 ```
 
 ### 產生文件
@@ -92,8 +89,8 @@ dash release publish --version 1.2.0 /path/to/project
 
 | 專案類型 | 偵測方式 | 檢查項目 |
 |----------|----------|----------|
-| Angular | `@angular/core` | PrimeNG、TypeScript、Bundle |
-| Vite | `vite` | Tailwind、DaisyUI、UX 模式 |
+| Angular | `angular.json` | PrimeNG、TypeScript、Bundle |
+| Vite | `vite` | Shoelace 使用、Emoji 圖示、UX 模式 |
 | React | `react` | JSX、Hooks、Bundle |
 | Node.js | Express/Fastify | API、Vercel、安全性 |
 | Python | `requirements.txt` | AI/ML、模型檔案 |
@@ -198,27 +195,7 @@ Push 前會自動執行：
 
 | 模板 | 說明 |
 |------|------|
-| `ios-theme.css` | iOS/macOS 風格 DaisyUI 主題 |
 | `deploy-netlify.yml` | GitHub Actions Netlify 備援部署 |
-
-### iOS 主題使用
-
-```bash
-# 複製到專案
-cp templates/ios-theme.css /path/to/project/src/styles/
-
-# 在 main.css 引入
-@import "./ios-theme.css";
-
-# HTML 使用主題
-<html data-theme="ios">
-```
-
-包含元件：
-- `.ios-glass` - 毛玻璃效果
-- `.ios-card` - iOS 風格卡片
-- `.ios-list` - iOS 列表
-- `.ios-navbar` / `.ios-tabbar` - 導航元件
 
 ---
 
@@ -437,17 +414,16 @@ cat file | claude -p "問題"    # 管道輸入
 | 專案 | 類型 | 說明 |
 |------|------|------|
 | MES 製造執行 | Angular + PrimeNG | 再生廠製造執行系統 |
-| SSO 管理後台 | Vite + DaisyUI | 用戶與權限管理 |
-| MSW 戰情室 | Vite + DaisyUI | 製程管理系統 |
-| EAP 設備自動化 | Vite + DaisyUI | 設備自動化平台 |
-| VAC 承攬商門禁 | Vite + DaisyUI | 承攬商門禁管理系統 |
-| RFID 追蹤 | Vite + DaisyUI | RFID 標籤追蹤系統 |
-| MCS 物料控制 | Vite + DaisyUI | 物料控制系統 |
-| MIDS 材料追蹤 | Vite + DaisyUI | 材料識別與追蹤系統 |
-| GHG 碳排管理 | Vite + DaisyUI | 溫室氣體排放管理系統 |
-| BPM 簽核流程 | Vite + DaisyUI | 簽核流程管理系統 |
-| RMS 配方管理 | Vite + DaisyUI | 配方管理系統 |
-| 8D 問題管理 | Vite + DaisyUI | 8D 問題解決流程管理 |
+| SSO 管理後台 | Vite + Shoelace | 用戶與權限管理 |
+| EAP 設備自動化 | Vite + Shoelace | 設備自動化平台 |
+| VAC 承攬商門禁 | Vite + Shoelace | 承攬商門禁管理系統 |
+| RFID 追蹤 | Vite + Shoelace | RFID 標籤追蹤系統 |
+| MCS 物料控制 | Vite + Shoelace | 物料控制系統 |
+| MIDS 材料追蹤 | Vite + Shoelace | 材料識別與追蹤系統 |
+| GHG 碳排管理 | Vite + Shoelace | 溫室氣體排放管理系統 |
+| BPM 簽核流程 | Vite + Shoelace | 簽核流程管理系統 |
+| RMS 配方管理 | Vite + Shoelace | 配方管理系統 |
+| 8D 問題管理 | Vite + Shoelace | 8D 問題解決流程管理 |
 | Vision AI | Python | AI 影像辨識系統 |
 | API Center | Vite + Shoelace | API 管理中心與開發文件 |
 

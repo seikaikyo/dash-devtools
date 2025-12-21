@@ -1,16 +1,21 @@
 """
 遷移工具集
+
+注意：Shoelace → DaisyUI 遷移器已棄用
+目前維持 Shoelace 作為非 Angular 專案的標準 UI 框架
 """
 
-from .shoelace_to_daisyui import ShoelaceToDaisyUIMigrator
-
-__all__ = ['ShoelaceToDaisyUIMigrator', 'run_migration']
+__all__ = ['run_migration']
 
 
 def run_migration(project, dry_run=False, from_framework='shoelace', to_framework='daisyui'):
-    """執行遷移"""
-    if from_framework == 'shoelace' and to_framework == 'daisyui':
-        migrator = ShoelaceToDaisyUIMigrator(project, dry_run=dry_run)
-        return migrator.run()
-    else:
-        return {'success': False, 'error': f'不支援的遷移: {from_framework} → {to_framework}'}
+    """執行遷移
+
+    注意：此功能已暫停使用
+    - Shoelace 維持為標準 UI 框架
+    - 遷移需要完整理解設計邏輯後才能進行
+    """
+    return {
+        'success': False,
+        'error': '遷移功能已暫停。UI 框架遷移需要完整理解設計邏輯後手動進行。'
+    }
