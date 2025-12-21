@@ -233,10 +233,11 @@ class CodeQualityValidator:
 
         if issues:
             total = sum(i['count'] for i in issues)
-            self.result['warnings'].append(
-                f"程式碼中使用 Emoji: {total} 個（建議改用 icon font）"
+            self.result['errors'].append(
+                f"[EMOJI] 程式碼中禁止使用 Emoji: {total} 個（請改用 icon font）"
             )
-            for issue in issues[:3]:
-                self.result['warnings'].append(
+            for issue in issues[:5]:
+                self.result['errors'].append(
                     f"  {issue['file']}: {''.join(issue['emojis'])}"
                 )
+            self.result['passed'] = False
