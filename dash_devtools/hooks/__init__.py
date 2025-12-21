@@ -24,8 +24,8 @@ echo "[i] DashAI DevTools Pre-push 檢查"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
-# 步驟 0: 檢查 Emoji
-echo "[>] 步驟 0/4: 檢查 Emoji..."
+# 步驟 1: 檢查 Emoji
+echo "[>] 步驟 1/4: 檢查 Emoji..."
 EMOJI_FILES=$(git diff --cached --name-only --diff-filter=ACM | xargs grep -l '[\\x{1F300}-\\x{1F9FF}]' 2>/dev/null || true)
 if [ -n "$EMOJI_FILES" ]; then
     echo "[x] 發現 Emoji，請移除："
@@ -35,8 +35,8 @@ fi
 echo "[v] 無 Emoji"
 echo ""
 
-# 步驟 1: 掃描機敏資料
-echo "[>] 步驟 1/4: 掃描機敏資料..."
+# 步驟 2: 掃描機敏資料
+echo "[>] 步驟 2/4: 掃描機敏資料..."
 dash scan "$PROJECT_ROOT"
 if [ $? -ne 0 ]; then
     echo ""
@@ -45,8 +45,8 @@ if [ $? -ne 0 ]; then
 fi
 echo ""
 
-# 步驟 2: 驗證專案規範
-echo "[>] 步驟 2/4: 驗證專案..."
+# 步驟 3: 驗證專案規範
+echo "[>] 步驟 3/4: 驗證專案..."
 if [ -f "$PROJECT_ROOT/package.json" ]; then
     dash validate "$PROJECT_ROOT" --check smart 2>/dev/null || true
 else
@@ -54,55 +54,67 @@ else
 fi
 echo ""
 
-# 步驟 3: 執行測試
-echo "[>] 步驟 3/4: 執行測試..."
+# 步驟 4: 執行測試
+echo "[>] 步驟 4/4: 執行測試..."
+TEST_RESULT=0
+
 if [ -f "$PROJECT_ROOT/package.json" ]; then
     # 檢查是否有測試腳本
     if grep -q '"test"' "$PROJECT_ROOT/package.json"; then
         cd "$PROJECT_ROOT"
 
-        # 偵測測試框架
+        # 偵測測試框架並執行
         if grep -q '"vitest"' package.json; then
             echo "   [vitest] 執行測試..."
-            npm run test:run 2>/dev/null || npx vitest run --passWithNoTests 2>/dev/null || true
+            npx vitest run --passWithNoTests 2>&1 || TEST_RESULT=$?
         elif grep -q '"jest"' package.json; then
             echo "   [jest] 執行測試..."
-            npm test -- --passWithNoTests 2>/dev/null || true
+            npx jest --passWithNoTests 2>&1 || TEST_RESULT=$?
+        elif grep -q '"karma"' package.json || grep -q '"@angular-devkit"' package.json; then
+            echo "   [karma] 執行測試..."
+            npm test -- --no-watch --browsers=ChromeHeadless 2>&1 || TEST_RESULT=$?
         else
             echo "   執行 npm test..."
-            npm test --if-present 2>/dev/null || true
+            npm test 2>&1 || TEST_RESULT=$?
         fi
 
-        if [ $? -ne 0 ]; then
-            echo ""
-            echo "[!] 測試失敗，但繼續推送 (警告模式)"
-            echo "    使用 DASH_STRICT_TEST=1 可強制測試通過"
+        if [ $TEST_RESULT -ne 0 ]; then
+            if [ "$DASH_STRICT_TEST" = "1" ]; then
+                echo ""
+                echo "[x] 測試失敗，推送已取消 (嚴格模式)"
+                exit 1
+            else
+                echo ""
+                echo "[!] 測試失敗，但繼續推送 (警告模式)"
+                echo "    使用 --strict 安裝 hook 可強制測試通過"
+            fi
+        else
+            echo "   [v] 測試通過"
         fi
     else
         echo "   (無測試腳本，跳過)"
     fi
-elif [ -f "$PROJECT_ROOT/pytest.ini" ] || [ -f "$PROJECT_ROOT/pyproject.toml" ]; then
+elif [ -f "$PROJECT_ROOT/pytest.ini" ] || [ -f "$PROJECT_ROOT/pyproject.toml" ] || [ -d "$PROJECT_ROOT/tests" ]; then
     echo "   [pytest] 執行測試..."
     cd "$PROJECT_ROOT"
-    python -m pytest -q --tb=no 2>/dev/null || true
+    python -m pytest -q --tb=short 2>&1 || TEST_RESULT=$?
+
+    if [ $TEST_RESULT -ne 0 ]; then
+        if [ "$DASH_STRICT_TEST" = "1" ]; then
+            echo ""
+            echo "[x] 測試失敗，推送已取消 (嚴格模式)"
+            exit 1
+        else
+            echo ""
+            echo "[!] 測試失敗，但繼續推送 (警告模式)"
+        fi
+    else
+        echo "   [v] 測試通過"
+    fi
 else
     echo "   (未偵測到測試框架，跳過)"
 fi
 echo ""
-
-# 步驟 4: 嚴格模式檢查
-if [ "$DASH_STRICT_TEST" = "1" ]; then
-    echo "[>] 步驟 4/4: 嚴格模式檢查..."
-    if [ -f "$PROJECT_ROOT/package.json" ] && grep -q '"test"' "$PROJECT_ROOT/package.json"; then
-        cd "$PROJECT_ROOT"
-        npm test --if-present
-        if [ $? -ne 0 ]; then
-            echo ""
-            echo "[x] 測試失敗，推送已取消 (嚴格模式)"
-            exit 1
-        fi
-    fi
-fi
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "[v] 所有檢查通過，繼續推送..."
