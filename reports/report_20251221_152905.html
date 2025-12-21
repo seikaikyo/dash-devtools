@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>dash-devtools - 專案報告</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            line-height: 1.6;
+            padding: 2rem;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header {
+            text-align: center;
+            padding: 2rem;
+            background: linear-gradient(135deg, #1e293b, #334155);
+            border-radius: 1rem;
+            margin-bottom: 2rem;
+        }
+        .header h1 { font-size: 2rem; margin-bottom: 0.5rem; }
+        .header .date { color: #94a3b8; font-size: 0.875rem; }
+        .total-score {
+            font-size: 4rem;
+            font-weight: bold;
+            color: #eab308;
+            margin: 1rem 0;
+        }
+        .section {
+            background: #1e293b;
+            border-radius: 1rem;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .section h2 {
+            font-size: 1.25rem;
+            margin-bottom: 1rem;
+            color: #38bdf8;
+        }
+        .scores-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+        }
+        .score-card {
+            background: #334155;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            text-align: center;
+        }
+        .score-value { font-size: 2rem; font-weight: bold; }
+        .score-label { color: #94a3b8; font-size: 0.875rem; }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1rem;
+        }
+        .stat-item {
+            background: #334155;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            text-align: center;
+        }
+        .stat-value { font-size: 1.5rem; font-weight: bold; color: #38bdf8; }
+        .stat-label { color: #94a3b8; font-size: 0.75rem; }
+        .lang-bar {
+            display: flex;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+        .lang-name { width: 100px; font-size: 0.875rem; }
+        .bar-container {
+            flex: 1;
+            height: 8px;
+            background: #334155;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 0 1rem;
+        }
+        .bar-fill { height: 100%; border-radius: 4px; }
+        .lang-pct { width: 60px; text-align: right; font-size: 0.875rem; color: #94a3b8; }
+        .test-result {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        .test-status {
+            padding: 0.5rem 1rem;
+            border-radius: 0.25rem;
+            font-weight: bold;
+        }
+        .test-stats .passed { color: #22c55e; }
+        .test-stats .failed { color: #ef4444; margin-left: 1rem; }
+        .test-framework { color: #94a3b8; margin-left: auto; }
+        .issues-list, .recommendations-list {
+            list-style: none;
+            padding-left: 0;
+        }
+        .issue, .recommendation {
+            padding: 0.5rem 1rem;
+            margin-bottom: 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.875rem;
+        }
+        .issue { background: rgba(239, 68, 68, 0.1); border-left: 3px solid #ef4444; }
+        .recommendation { background: rgba(234, 179, 8, 0.1); border-left: 3px solid #eab308; }
+        .screenshots-grid { display: grid; gap: 1rem; }
+        .screenshot img {
+            max-width: 100%;
+            border-radius: 0.5rem;
+            border: 1px solid #334155;
+        }
+        .screenshot-url {
+            font-size: 0.75rem;
+            color: #94a3b8;
+            margin-bottom: 0.5rem;
+        }
+        .footer {
+            text-align: center;
+            color: #64748b;
+            font-size: 0.75rem;
+            margin-top: 2rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>dash-devtools</h1>
+            <div class="date">報告產生時間: 2025-12-21 15:29:05</div>
+            <div class="total-score">87/100</div>
+        </div>
+
+        <div class="section">
+            <h2>健康評分</h2>
+            <div class="scores-grid">
+                
+            <div class="score-card">
+                <div class="score-value" style="color: #22c55e">100</div>
+                <div class="score-label">安全性</div>
+            </div>
+            
+            <div class="score-card">
+                <div class="score-value" style="color: #eab308">80</div>
+                <div class="score-label">品質</div>
+            </div>
+            
+            <div class="score-card">
+                <div class="score-value" style="color: #eab308">70</div>
+                <div class="score-label">維護性</div>
+            </div>
+            
+            <div class="score-card">
+                <div class="score-value" style="color: #22c55e">100</div>
+                <div class="score-label">效能</div>
+            </div>
+            
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>程式碼統計</h2>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-value">37</div>
+                    <div class="stat-label">檔案數</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">7,097</div>
+                    <div class="stat-label">總行數</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">2,460</div>
+                    <div class="stat-label">程式碼行數</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">222 KB</div>
+                    <div class="stat-label">大小</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>語言分佈</h2>
+            
+            <div class="lang-bar">
+                <span class="lang-name">Python</span>
+                <div class="bar-container">
+                    <div class="bar-fill" style="width: 91.92616598562773%; background: #3b82f6;"></div>
+                </div>
+                <span class="lang-pct">91.9%</span>
+            </div>
+            
+            <div class="lang-bar">
+                <span class="lang-name">Markdown</span>
+                <div class="bar-container">
+                    <div class="bar-fill" style="width: 6.270255037339721%; background: #22c55e;"></div>
+                </div>
+                <span class="lang-pct">6.3%</span>
+            </div>
+            
+            <div class="lang-bar">
+                <span class="lang-name">JavaScript</span>
+                <div class="bar-container">
+                    <div class="bar-fill" style="width: 1.5922220656615471%; background: #eab308;"></div>
+                </div>
+                <span class="lang-pct">1.6%</span>
+            </div>
+            
+            <div class="lang-bar">
+                <span class="lang-name">JSON</span>
+                <div class="bar-container">
+                    <div class="bar-fill" style="width: 0.21135691137100185%; background: #ef4444;"></div>
+                </div>
+                <span class="lang-pct">0.2%</span>
+            </div>
+            
+        </div>
+
+        
+            <div class="section">
+                <h2>測試結果</h2>
+                <div class="test-result">
+                    <div class="test-status" style="background: #22c55e">PASS</div>
+                    <div class="test-stats">
+                        <span class="passed">0 passed</span>
+                        <span class="failed">0 failed</span>
+                    </div>
+                    <div class="test-framework">Framework: unknown</div>
+                </div>
+            </div>
+            
+
+        
+
+        <div class="section">
+            <h2>問題與建議</h2>
+            <h3 style="color: #ef4444; font-size: 0.875rem; margin-bottom: 0.5rem;">問題</h3>
+            <ul class="issues-list"><li class="issue">1 個檔案超過 500 行</li></ul>
+            <h3 style="color: #eab308; font-size: 0.875rem; margin: 1rem 0 0.5rem;">建議</h3>
+            <ul class="recommendations-list"><li class="recommendation">建議加入 ESLint 設定</li><li class="recommendation">建議加入 Prettier 設定</li><li class="recommendation">建議加入 CLAUDE.md (dash docs claude)</li><li class="recommendation">建議加入測試</li><li class="recommendation">建議使用 Git hooks (dash hooks install)</li></ul>
+        </div>
+
+        <div class="footer">
+            Generated by DashAI DevTools v2.0
+        </div>
+    </div>
+</body>
+</html>
