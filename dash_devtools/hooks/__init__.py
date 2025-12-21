@@ -15,7 +15,6 @@ PRE_PUSH_HOOK = '''#!/bin/bash
 # DashAI DevTools Pre-push Hook v2.0
 # 推送前自動檢查：安全性 + 測試
 
-set -e
 PROJECT_ROOT="$(git rev-parse --show-toplevel)"
 
 echo ""
