@@ -47,7 +47,7 @@ def main():
 
 
 @main.command()
-@click.argument('project', type=click.Path(exists=True), required=False)
+@click.argument('project', type=click.Path(), required=False)
 @click.option('--all', 'validate_all', is_flag=True, help='驗證所有專案')
 @click.option('--check', type=click.Choice(['security', 'migration', 'performance', 'code_quality', 'all', 'smart']),
               default='smart', help='指定檢查項目 (smart=自動偵測專案類型)')
@@ -120,7 +120,7 @@ def validate(project, validate_all, check, fix, output):
 
 
 @main.command()
-@click.argument('project', type=click.Path(exists=True))
+@click.argument('project', type=click.Path())
 @click.option('--dry-run', is_flag=True, help='預覽模式，不實際修改')
 @click.option('--from', 'from_framework', default='shoelace', help='來源框架')
 @click.option('--to', 'to_framework', default='daisyui', help='目標框架')
@@ -151,7 +151,7 @@ def docs():
 
 
 @docs.command()
-@click.argument('project', type=click.Path(exists=True), required=False)
+@click.argument('project', type=click.Path(), required=False)
 @click.option('--all', 'gen_all', is_flag=True, help='產生所有專案的 CLAUDE.md')
 def claude(project, gen_all):
     """產生 CLAUDE.md"""
@@ -198,7 +198,7 @@ def status():
 
 
 @release.command()
-@click.argument('project', type=click.Path(exists=True))
+@click.argument('project', type=click.Path())
 @click.option('--version', '-v', required=True, help='版本號')
 def publish(project, version):
     """發布新版本"""
@@ -213,7 +213,7 @@ def publish(project, version):
 
 
 @main.command()
-@click.argument('image', type=click.Path(exists=True))
+@click.argument('image', type=click.Path())
 @click.option('--output', '-o', type=click.Path(), help='輸出路徑')
 def vision(image, output):
     """視覺 AI 分析"""
@@ -224,7 +224,7 @@ def vision(image, output):
 
 
 @main.command()
-@click.argument('project', type=click.Path(exists=True), default='.')
+@click.argument('project', type=click.Path(), default='.')
 def scan(project):
     """掃描機敏資料"""
     from .hooks import run_pre_push_check
@@ -253,7 +253,7 @@ def hooks():
 
 
 @hooks.command()
-@click.argument('project', type=click.Path(exists=True), default='.')
+@click.argument('project', type=click.Path(), default='.')
 @click.option('--strict', is_flag=True, help='嚴格模式：測試失敗會阻止推送')
 def install(project, strict):
     """安裝 Git Hooks 到專案
@@ -289,7 +289,7 @@ def install(project, strict):
 
 
 @main.command()
-@click.argument('project', type=click.Path(exists=True), default='.')
+@click.argument('project', type=click.Path(), default='.')
 @click.option('--copy', 'do_copy', is_flag=True, help='複製連結到剪貼簿')
 @click.option('--open', 'do_open', is_flag=True, help='在瀏覽器開啟')
 @click.option('--save', is_flag=True, help='儲存連結到 docs/dbdiagram-link.txt')
@@ -360,7 +360,7 @@ def db():
 
 
 @db.command()
-@click.argument('project', type=click.Path(exists=True), default='.')
+@click.argument('project', type=click.Path(), default='.')
 def init(project):
     """初始化 Alembic 遷移環境
 
@@ -382,7 +382,7 @@ def init(project):
 
 
 @db.command('status')
-@click.argument('project', type=click.Path(exists=True), default='.')
+@click.argument('project', type=click.Path(), default='.')
 def db_status(project):
     """檢視遷移狀態
 
@@ -416,7 +416,7 @@ def db_status(project):
 
 
 @db.command()
-@click.argument('project', type=click.Path(exists=True), default='.')
+@click.argument('project', type=click.Path(), default='.')
 @click.option('--message', '-m', required=True, help='遷移描述')
 @click.option('--autogenerate', '-a', is_flag=True, default=True, help='自動偵測 Model 變更')
 def generate(project, message, autogenerate):
@@ -446,7 +446,7 @@ def generate(project, message, autogenerate):
 
 
 @db.command()
-@click.argument('project', type=click.Path(exists=True), default='.')
+@click.argument('project', type=click.Path(), default='.')
 @click.option('--revision', '-r', default='head', help='目標版本 (預設: head)')
 @click.option('--dry-run', is_flag=True, help='預覽模式，顯示 SQL 但不執行')
 def upgrade(project, revision, dry_run):
@@ -479,7 +479,7 @@ def upgrade(project, revision, dry_run):
 
 
 @db.command()
-@click.argument('project', type=click.Path(exists=True), default='.')
+@click.argument('project', type=click.Path(), default='.')
 @click.option('--revision', '-r', required=True, help='目標版本')
 @click.option('--confirm', is_flag=True, help='確認執行危險操作')
 def downgrade(project, revision, confirm):
@@ -514,7 +514,7 @@ def downgrade(project, revision, confirm):
 # ============================================================
 
 @main.command()
-@click.argument('project', type=click.Path(exists=True), default='.')
+@click.argument('project', type=click.Path(), default='.')
 @click.option('--all', 'check_all', is_flag=True, help='檢查所有專案')
 @click.option('--json', 'output_json', is_flag=True, help='輸出 JSON 格式')
 def health(project, check_all, output_json):
@@ -562,7 +562,7 @@ def health(project, check_all, output_json):
 
 
 @main.command()
-@click.argument('project', type=click.Path(exists=True), default='.')
+@click.argument('project', type=click.Path(), default='.')
 @click.option('--all', 'stats_all', is_flag=True, help='統計所有專案並比較')
 def stats(project, stats_all):
     """程式碼統計
@@ -587,7 +587,7 @@ def stats(project, stats_all):
 
 
 @main.command('init-test')
-@click.argument('project', type=click.Path(exists=True), default='.')
+@click.argument('project', type=click.Path(), default='.')
 @click.option('--e2e', is_flag=True, help='同時設定 Playwright E2E 測試')
 def init_test(project, e2e):
     """初始化測試框架
@@ -607,7 +607,7 @@ def init_test(project, e2e):
 
 
 @main.command()
-@click.argument('project', type=click.Path(exists=True), default='.')
+@click.argument('project', type=click.Path(), default='.')
 @click.option('--all', 'test_all', is_flag=True, help='測試所有專案')
 @click.option('--coverage', '-c', is_flag=True, help='產生覆蓋率報告')
 @click.option('--verbose', '-v', is_flag=True, help='詳細輸出')
@@ -633,7 +633,7 @@ def test(project, test_all, coverage, verbose):
 
 
 @main.command()
-@click.argument('project', type=click.Path(exists=True), default='.')
+@click.argument('project', type=click.Path(), default='.')
 @click.option('--test/--no-test', 'include_test', default=True, help='是否執行測試')
 @click.option('--screenshot', '-s', is_flag=True, help='擷取 UI 截圖')
 @click.option('--url', '-u', multiple=True, help='截圖的 URL (可多個)')
@@ -663,7 +663,7 @@ def report(project, include_test, screenshot, url, open_browser):
 
 
 @main.command()
-@click.argument('project', type=click.Path(exists=True), default='.')
+@click.argument('project', type=click.Path(), default='.')
 @click.option('--fix', 'auto_fix', is_flag=True, help='發現問題自動修復')
 @click.option('--interval', '-i', type=float, default=1.0, help='檢查間隔(秒)')
 def watch(project, auto_fix, interval):
@@ -688,6 +688,28 @@ def watch(project, auto_fix, interval):
 # AI 引擎指令
 # ============================================================
 
+def _handle_ai_error(e: Exception) -> None:
+    """處理 AI 相關錯誤，提供精確的修復建議"""
+    error_msg = str(e).lower()
+
+    if 'google.generativeai' in error_msg or 'google-generativeai' in error_msg:
+        console.print("[red]缺少 Google Generative AI SDK[/red]")
+        console.print("[yellow]請執行: pip install google-generativeai[/yellow]")
+    elif 'dotenv' in error_msg:
+        console.print("[red]缺少 python-dotenv[/red]")
+        console.print("[yellow]請執行: pip install python-dotenv[/yellow]")
+    elif 'gemini_api_key' in error_msg or 'api_key' in error_msg:
+        console.print("[red]未設定 GEMINI_API_KEY 環境變數[/red]")
+        console.print("[yellow]請執行: export GEMINI_API_KEY='your-api-key'[/yellow]")
+    elif isinstance(e, ImportError):
+        console.print(f"[red]模組載入失敗: {e}[/red]")
+        console.print("[yellow]請執行: pip install google-generativeai python-dotenv[/yellow]")
+    elif isinstance(e, ValueError):
+        console.print(f"[red]設定錯誤: {e}[/red]")
+    else:
+        console.print(f"[red]錯誤: {e}[/red]")
+
+
 @main.group()
 def ai():
     """AI 程式碼助手 (Gemini)
@@ -706,7 +728,7 @@ def ai():
 
 
 @ai.command()
-@click.argument('file', type=click.Path(exists=True))
+@click.argument('file', type=click.Path())
 @click.option('--focus', '-f', type=click.Choice(['general', 'security', 'performance', 'quality']),
               default='general', help='分析重點')
 def analyze(file, focus):
@@ -731,15 +753,12 @@ def analyze(file, focus):
             console.print(response.content)
         else:
             console.print(f"[red]錯誤: {response.error}[/red]")
-    except ImportError as e:
-        console.print(f"[red]需要安裝 AI 套件: pip install dash-devtools[ai][/red]")
-        console.print(f"[dim]{e}[/dim]")
-    except ValueError as e:
-        console.print(f"[red]{e}[/red]")
+    except Exception as e:
+        _handle_ai_error(e)
 
 
 @ai.command()
-@click.argument('file', type=click.Path(exists=True))
+@click.argument('file', type=click.Path())
 @click.option('--error', '-e', required=True, help='錯誤訊息')
 def fix(file, error):
     """建議修復方案
@@ -761,14 +780,12 @@ def fix(file, error):
             console.print(response.content)
         else:
             console.print(f"[red]錯誤: {response.error}[/red]")
-    except ImportError:
-        console.print(f"[red]需要安裝 AI 套件: pip install dash-devtools[ai][/red]")
-    except ValueError as e:
-        console.print(f"[red]{e}[/red]")
+    except Exception as e:
+        _handle_ai_error(e)
 
 
 @ai.command('test')
-@click.argument('file', type=click.Path(exists=True))
+@click.argument('file', type=click.Path())
 @click.option('--framework', '-f', default='auto', help='測試框架 (auto/pytest/jest/vitest)')
 @click.option('--coverage', '-c', type=click.Choice(['basic', 'comprehensive', 'edge-cases']),
               default='comprehensive', help='覆蓋範圍')
@@ -793,14 +810,12 @@ def generate_test(file, framework, coverage):
             console.print(response.content)
         else:
             console.print(f"[red]錯誤: {response.error}[/red]")
-    except ImportError:
-        console.print(f"[red]需要安裝 AI 套件: pip install dash-devtools[ai][/red]")
-    except ValueError as e:
-        console.print(f"[red]{e}[/red]")
+    except Exception as e:
+        _handle_ai_error(e)
 
 
 @ai.command()
-@click.argument('file', type=click.Path(exists=True))
+@click.argument('file', type=click.Path())
 @click.option('--detail', '-d', type=click.Choice(['brief', 'medium', 'detailed']),
               default='medium', help='詳細程度')
 def explain(file, detail):
@@ -824,14 +839,12 @@ def explain(file, detail):
             console.print(response.content)
         else:
             console.print(f"[red]錯誤: {response.error}[/red]")
-    except ImportError:
-        console.print(f"[red]需要安裝 AI 套件: pip install dash-devtools[ai][/red]")
-    except ValueError as e:
-        console.print(f"[red]{e}[/red]")
+    except Exception as e:
+        _handle_ai_error(e)
 
 
 @ai.command()
-@click.argument('project', type=click.Path(exists=True), default='.')
+@click.argument('project', type=click.Path(), default='.')
 def review(project):
     """審查最新 commit
 
@@ -868,12 +881,96 @@ def review(project):
             console.print(response.content)
         else:
             console.print(f"[red]錯誤: {response.error}[/red]")
-    except ImportError:
-        console.print(f"[red]需要安裝 AI 套件: pip install dash-devtools[ai][/red]")
-    except ValueError as e:
-        console.print(f"[red]{e}[/red]")
     except Exception as e:
-        console.print(f"[red]錯誤: {e}[/red]")
+        _handle_ai_error(e)
+
+
+@main.command()
+def doctor():
+    """診斷開發環境
+
+    顯示系統資訊、Python 路徑、套件版本等，方便偵錯。
+
+    使用範例：
+      dash doctor
+    """
+    import sys
+    import os
+    import platform
+    from pathlib import Path
+
+    console.print("[cyan]═══ DashAI DevTools 診斷資訊 ═══[/cyan]\n")
+
+    # 系統資訊
+    console.print("[yellow]系統資訊[/yellow]")
+    console.print(f"  作業系統: {platform.system()} {platform.release()}")
+    console.print(f"  Python 版本: {sys.version.split()[0]}")
+    console.print(f"  Python 執行檔: {sys.executable}")
+    console.print()
+
+    # 工作目錄
+    console.print("[yellow]工作目錄[/yellow]")
+    console.print(f"  當前目錄: {os.getcwd()}")
+    console.print(f"  家目錄: {Path.home()}")
+    console.print()
+
+    # Python 路徑
+    console.print("[yellow]Python 路徑 (sys.path)[/yellow]")
+    for i, p in enumerate(sys.path, 1):
+        console.print(f"  {i}. {p}")
+    console.print()
+
+    # 套件資訊
+    console.print("[yellow]已安裝套件[/yellow]")
+    try:
+        import importlib.metadata
+        dist = importlib.metadata.distribution('dash-devtools')
+        console.print(f"  dash-devtools: {dist.version}")
+        console.print(f"  安裝位置: {dist.locate_file('')}")
+    except Exception as e:
+        console.print(f"  [red]無法取得套件資訊: {e}[/red]")
+    console.print()
+
+    # 依賴套件
+    console.print("[yellow]核心依賴套件[/yellow]")
+    deps = ['click', 'rich', 'pyyaml', 'jinja2']
+    for dep in deps:
+        try:
+            import importlib.metadata
+            ver = importlib.metadata.version(dep)
+            console.print(f"  ✓ {dep}: {ver}")
+        except:
+            console.print(f"  ✗ {dep}: [red]未安裝[/red]")
+    console.print()
+
+    # 可選依賴
+    console.print("[yellow]可選依賴套件[/yellow]")
+    optional_deps = [
+        ('google-generativeai', 'AI 功能'),
+        ('opencv-python', 'Vision 功能'),
+        ('pillow', 'Vision 功能'),
+    ]
+    for dep, desc in optional_deps:
+        try:
+            import importlib.metadata
+            ver = importlib.metadata.version(dep)
+            console.print(f"  ✓ {dep}: {ver} ({desc})")
+        except:
+            console.print(f"  ✗ {dep}: [dim]未安裝 ({desc})[/dim]")
+    console.print()
+
+    # 環境變數
+    console.print("[yellow]相關環境變數[/yellow]")
+    env_vars = ['GEMINI_API_KEY', 'GITGUARDIAN_API_KEY']
+    for var in env_vars:
+        val = os.environ.get(var)
+        if val:
+            console.print(f"  ✓ {var}: [dim]已設定[/dim]")
+        else:
+            console.print(f"  ✗ {var}: [dim]未設定[/dim]")
+    console.print()
+
+    console.print("[green]診斷完成！[/green]")
 
 
 if __name__ == '__main__':

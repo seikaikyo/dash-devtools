@@ -8,11 +8,20 @@ from typing import Optional, List, Dict, Any
 from dataclasses import dataclass
 from enum import Enum
 
+# 載入 .env 檔案 (如果存在)
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # dotenv 是可選的
+
+# 檢查 Google Generative AI SDK
 try:
     import google.generativeai as genai
     GENAI_AVAILABLE = True
-except ImportError:
+except ImportError as e:
     GENAI_AVAILABLE = False
+    _GENAI_IMPORT_ERROR = str(e)
 
 
 class AIModel(Enum):
@@ -57,9 +66,11 @@ class AIEngine:
             api_key: API Key (預設從環境變數 GEMINI_API_KEY 讀取)
         """
         if not GENAI_AVAILABLE:
+            error_detail = _GENAI_IMPORT_ERROR if '_GENAI_IMPORT_ERROR' in dir() else ''
             raise ImportError(
-                "Google Generative AI SDK 未安裝。\n"
-                "請執行: pip install google-generativeai"
+                f"Google Generative AI SDK 未安裝或載入失敗。\n"
+                f"錯誤: {error_detail}\n"
+                f"請執行: pip install google-generativeai"
             )
 
         self.api_key = api_key or os.environ.get("GEMINI_API_KEY")
