@@ -40,8 +40,11 @@ vision = [
     "pillow>=10.0",
     "numpy>=1.24",
 ]
+ai = [
+    "google-generativeai>=0.8.0",
+]
 all = [
-    "dash-devtools[dev,vision]",
+    "dash-devtools[dev,vision,ai]",
 ]
 
 [project.scripts]
