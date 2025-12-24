@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="zh-TW" class="sl-theme-light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Demo Corp企業 GHG 盤查系統</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.15.0/cdn/themes/light.css" />
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.15.0/cdn/shoelace.js"></script>
+    
+    <style>
+        :root {
+            --brand-blue: #1a73e8;
+            --brand-green: #34a853;
+            --sl-font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+        }
+        body {
+            display: flex;
+            height: 100vh;
+            margin: 0;
+            background-color: var(--sl-color-neutral-50);
+            overflow: hidden;
+            font-family: var(--sl-font-sans);
+        }
+        /* 左側導航欄 (Sidebar) */
+        .sidebar {
+            width: 260px;
+            background: white;
+            border-right: 1px solid var(--sl-color-neutral-200);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+        }
+        .sidebar-header {
+            padding: 20px;
+            font-weight: 700;
+            font-size: 1.2rem;
+            color: var(--brand-blue);
+            border-bottom: 1px solid var(--sl-color-neutral-100);
+            display: flex;
+            align-items: center;
+        }
+        .nav-group {
+            padding: 15px 20px 5px;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            color: var(--sl-color-neutral-500);
+            letter-spacing: 0.05em;
+            font-weight: 600;
+        }
+        /* 主內容區 (Main Content) */
+        .main-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 30px;
+            position: relative;
+        }
+        /* SPA 視圖切換邏輯 */
+        .view-section {
+            display: none; /* 預設隱藏 */
+            animation: fadeIn 0.3s ease;
+        }
+        .view-section.active {
+            display: block; /* 啟用顯示 */
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+        }
+        /* 共用 Grid 樣式 */
+        .grid-kpi { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 20px; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+        
+        /* 響應式調整 */
+        @media (max-width: 1024px) {
+            .grid-kpi { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+<body>
+
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <sl-icon name="globe-asia-australia" style="margin-right: 8px; font-size: 1.2rem;"></sl-icon>
+            GHG 管理系統
+        </div>
+        
+        <div style="flex: 1; overflow-y: auto;">
+            <div class="nav-group">總覽分析</div>
+            <sl-menu>
+                <sl-menu-item value="dashboard" onclick="navigateTo('dashboard')" checked>
+                    <sl-icon name="speedometer2" slot="prefix"></sl-icon> 儀表板
+                </sl-menu-item>
+                <sl-menu-item value="inventory" onclick="navigateTo('inventory')">
+                    <sl-icon name="list-task" slot="prefix"></sl-icon> 排放清冊
+                </sl-menu-item>
+            </sl-menu>
+
+            <div class="nav-group">數據作業</div>
+            <sl-menu>
+                <sl-menu-item value="data-entry" onclick="navigateTo('data-entry')">
+                    <sl-icon name="pencil-square" slot="prefix"></sl-icon> 數據盤查 (CRUD)
+                </sl-menu-item>
+                <sl-menu-item value="factors" onclick="navigateTo('factors')">
+                    <sl-icon name="calculator" slot="prefix"></sl-icon> 排放係數庫
+                </sl-menu-item>
+            </sl-menu>
+
+            <div class="nav-group">審核與系統</div>
+            <sl-menu>
+                <sl-menu-item value="audit" onclick="navigateTo('audit')">
+                    <sl-icon name="clock-history" slot="prefix"></sl-icon> 歷代送審紀錄
+                </sl-menu-item>
+                <sl-menu-item value="settings" onclick="alert('系統設定功能開發中')">
+                    <sl-icon name="gear" slot="prefix"></sl-icon> 邊界設定
+                </sl-menu-item>
+            </sl-menu>
+        </div>
+        
+        <div style="padding: 15px; border-top: 1px solid var(--sl-color-neutral-200); background-color: var(--sl-color-neutral-50);">
+            <div style="display:flex; align-items:center; gap:10px;">
+                <sl-avatar label="User" style="--size: 2.5rem;"></sl-avatar>
+                <div style="font-size:0.85rem;">
+                    <strong>管理員</strong><br>
+                    [cite_start]<span style="color:gray;">Demo Corp - 範例工廠 [cite: 21]</span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="main-content">
+
+        <div id="dashboard" class="view-section active">
+            <div class="page-header">
+                <div>
+                    <sl-breadcrumb>
+                        <sl-breadcrumb-item>首頁</sl-breadcrumb-item>
+                        <sl-breadcrumb-item>儀表板</sl-breadcrumb-item>
+                    </sl-breadcrumb>
+                    <h1>📊 2024 年度盤查總覽</h1>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <sl-select value="shanhua" size="small" style="width: 150px;">
+                        <sl-option value="shanhua">台南範例工廠</sl-option>
+                        <sl-option value="dayun">工廠B廠區</sl-option>
+                    </sl-select>
+                    <sl-button variant="primary" size="small" outline>
+                        <sl-icon name="download" slot="prefix"></sl-icon> 匯出報告
+                    </sl-button>
+                </div>
+            </div>
+
+            <div class="grid-kpi">
+                <sl-card>
+                    <small style="color: gray;">總排放量 (tCO2e)</small>
+                    <div style="font-size: 2rem; font-weight: 700; color: var(--brand-blue);">105,432</div>
+                    <sl-badge variant="danger" pill>↑ 5.2% YoY</sl-badge>
+                </sl-card>
+                <sl-card>
+                    [cite_start]<small style="color: gray;">範疇二購電 (度) [cite: 48]</small>
+                    <div style="font-size: 2rem; font-weight: 700;">124,400</div>
+                    <div style="font-size: 0.8rem; color: var(--brand-green);">來源: 台電帳單</div>
+                </sl-card>
+                <sl-card>
+                    [cite_start]<small style="color: gray;">主要排放源 [cite: 62]</small>
+                    <div style="font-size: 1.5rem; font-weight: 700;">Carbon 採購</div>
+                    <div style="font-size: 0.8rem; color: gray;">範疇三 (類別 3.1)</div>
+                </sl-card>
+                <sl-card>
+                    <small style="color: gray;">待辦事項</small>
+                    <div style="font-size: 2rem; font-weight: 700; color: orange;">3</div>
+                    <sl-button variant="text" size="small">查看詳情</sl-button>
+                </sl-card>
+            </div>
+
+            <div class="grid-2">
+                <sl-card>
+                    <div slot="header"><strong>排放範疇佔比 (Scopes)</strong></div>
+                    <div style="height: 250px; background: #f8f9fa; display:flex; align-items:center; justify-content:center; color:gray; border-radius: 4px;">
+                        [圓餅圖: 範疇三 > 範疇二 > 範疇一]
+                    </div>
+                </sl-card>
+                <sl-card>
+                    <div slot="header"><strong>月度排放趨勢</strong></div>
+                    <div style="height: 250px; background: #f8f9fa; display:flex; align-items:center; justify-content:center; color:gray; border-radius: 4px;">
+                        [折線圖: 1月 - 12月趨勢]
+                    </div>
+                </sl-card>
+            </div>
+        </div>
+
+        <div id="data-entry" class="view-section">
+            <div class="page-header">
+                <div>
+                    <sl-breadcrumb>
+                        <sl-breadcrumb-item>數據作業</sl-breadcrumb-item>
+                        <sl-breadcrumb-item>數據盤查</sl-breadcrumb-item>
+                    </sl-breadcrumb>
+                    <h1>📝 盤查數據管理 (CRUD)</h1>
+                </div>
+                <sl-button variant="primary" onclick="openDrawer()">
+                    <sl-icon name="plus-lg" slot="prefix"></sl-icon> 新增數據
+                </sl-button>
+            </div>
+
+            <sl-tab-group>
+                <sl-tab slot="nav" panel="scope1" active>範疇一 (直接排放)</sl-tab>
+                <sl-tab slot="nav" panel="scope2">範疇二 (能源間接)</sl-tab>
+                <sl-tab slot="nav" panel="scope3">範疇三 (其他間接)</sl-tab>
+
+                <sl-tab-panel name="scope1">
+                    <sl-card style="margin-top: 15px;">
+                        <div slot="header" style="display:flex; justify-content:space-between; align-items:center;">
+                            <strong>固定/移動燃燒與逸散</strong>
+                            <sl-input placeholder="搜尋排放源..." size="small" style="width: 200px;">
+                                <sl-icon name="search" slot="prefix"></sl-icon>
+                            </sl-input>
+                        </div>
+                        <sl-table>
+                            <thead>
+                                <tr>
+                                    <th>類別</th>
+                                    <th>排放源/設備</th>
+                                    [cite_start]<th>燃料/冷媒 [cite: 28, 40]</th>
+                                    <th>活動數據 (用量)</th>
+                                    <th>單位</th>
+                                    <th>排放量 (tCO2e)</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>固定燃燒</td>
+                                    [cite_start]<td>緊急發電機 [cite: 28]</td>
+                                    <td>柴油</td>
+                                    <td>4.00</td>
+                                    <td>L/年</td>
+                                    <td>0.011</td>
+                                    <td>
+                                        <sl-icon-button name="pencil" label="Edit"></sl-icon-button>
+                                        <sl-icon-button name="trash" label="Delete"></sl-icon-button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>移動燃燒</td>
+                                    [cite_start]<td>移動設備 [cite: 31]</td>
+                                    <td>柴油</td>
+                                    <td>1,244.00</td>
+                                    <td>L/年</td>
+                                    <td>3.335</td>
+                                    <td>
+                                        <sl-icon-button name="pencil"></sl-icon-button>
+                                        <sl-icon-button name="trash"></sl-icon-button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>逸散排放</td>
+                                    [cite_start]<td>冰水主機 [cite: 40]</td>
+                                    <td>R-410A</td>
+                                    <td>1.20</td>
+                                    <td>kg (充填)</td>
+                                    <td>2.505</td>
+                                    <td>
+                                        <sl-icon-button name="pencil"></sl-icon-button>
+                                        <sl-icon-button name="trash"></sl-icon-button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </sl-table>
+                    </sl-card>
+                </sl-tab-panel>
+
+                <sl-tab-panel name="scope2">
+                    <sl-card style="margin-top: 15px;">
+                        <div slot="header"><strong>購電用電數據</strong></div>
+                        <sl-table>
+                            <thead>
+                                <tr>
+                                    <th>月份</th>
+                                    <th>數據來源</th>
+                                    [cite_start]<th>用電量 (度) [cite: 48]</th>
+                                    <th>電力係數</th>
+                                    <th>排放量 (tCO2e)</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>2024-01</td>
+                                    <td>台電帳單</td>
+                                    <td>124,400</td>
+                                    [cite_start]<td>0.495 [cite: 50]</td>
+                                    <td>61.578</td>
+                                    <td>
+                                        <sl-icon-button name="pencil"></sl-icon-button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </sl-table>
+                    </sl-card>
+                </sl-tab-panel>
+
+                <sl-tab-panel name="scope3">
+                    <sl-card style="margin-top: 15px;">
+                        <div slot="header"><strong>其他間接排放 (原物料、運輸等)</strong></div>
+                        <sl-table>
+                            <thead>
+                                <tr>
+                                    <th>類別</th>
+                                    <th>項目名稱</th>
+                                    <th>活動數據</th>
+                                    <th>單位</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>原物料採購</td>
+                                    [cite_start]<td>ABS [cite: 60]</td>
+                                    <td>95,217</td>
+                                    <td>kg</td>
+                                    <td><sl-icon-button name="pencil"></sl-icon-button></td>
+                                </tr>
+                                <tr>
+                                    <td>員工通勤</td>
+                                    [cite_start]<td>公車 [cite: 91]</td>
+                                    <td>1,440</td>
+                                    <td>pkm</td>
+                                    <td><sl-icon-button name="pencil"></sl-icon-button></td>
+                                </tr>
+                            </tbody>
+                        </sl-table>
+                    </sl-card>
+                </sl-tab-panel>
+            </sl-tab-group>
+        </div>
+
+        <div id="factors" class="view-section">
+            <div class="page-header">
+                <div>
+                    <sl-breadcrumb>
+                        <sl-breadcrumb-item>數據作業</sl-breadcrumb-item>
+                        <sl-breadcrumb-item>排放係數庫</sl-breadcrumb-item>
+                    </sl-breadcrumb>
+                    <h1>🧮 排放係數管理</h1>
+                </div>
+                <sl-button variant="default">更新至最新版本</sl-button>
+            </div>
+
+            <sl-alert variant="success" open>
+                <sl-icon slot="icon" name="check-circle"></sl-icon>
+                [cite_start]目前使用係數版本：<strong>113年2月5日公告</strong> 及 <strong>IPCC AR6 (2021)</strong> [cite: 112, 123]
+            </sl-alert>
+            <br>
+            
+            <sl-card>
+                <sl-table>
+                    <thead>
+                        <tr>
+                            <th>係數類別</th>
+                            <th>名稱</th>
+                            <th>CO2e 係數值</th>
+                            <th>單位</th>
+                            [cite_start]<th>GWP (AR6) [cite: 123]</th>
+                            <th>來源</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>燃料</td>
+                            <td>車用汽油</td>
+                            [cite_start]<td>2.2077 [cite: 122]</td>
+                            <td>kgCO2/L</td>
+                            <td>-</td>
+                            <td>能源局</td>
+                        </tr>
+                        <tr>
+                            <td>燃料</td>
+                            <td>柴油</td>
+                            [cite_start]<td>2.6811 [cite: 122]</td>
+                            <td>kgCO2/L</td>
+                            <td>-</td>
+                            <td>能源局</td>
+                        </tr>
+                        <tr>
+                            <td>GWP</td>
+                            <td>CH4 (甲烷)</td>
+                            <td>-</td>
+                            <td>-</td>
+                            [cite_start]<td>27.9 [cite: 124]</td>
+                            <td>IPCC</td>
+                        </tr>
+                        <tr>
+                            <td>GWP</td>
+                            <td>R-410A</td>
+                            <td>-</td>
+                            <td>-</td>
+                            [cite_start]<td>2088 [cite: 124]</td>
+                            <td>IPCC</td>
+                        </tr>
+                        <tr>
+                            <td>電力</td>
+                            <td>2023 電力係數</td>
+                            [cite_start]<td>0.495 [cite: 128]</td>
+                            <td>kgCO2e/度</td>
+                            <td>-</td>
+                            <td>能源局</td>
+                        </tr>
+                    </tbody>
+                </sl-table>
+            </sl-card>
+        </div>
+
+        <div id="audit" class="view-section">
+             <div class="page-header">
+                <div>
+                    <sl-breadcrumb>
+                        <sl-breadcrumb-item>審核與系統</sl-breadcrumb-item>
+                        <sl-breadcrumb-item>送審紀錄</sl-breadcrumb-item>
+                    </sl-breadcrumb>
+                    <h1>🕰️ 歷代送審與稽核</h1>
+                </div>
+            </div>
+
+            <sl-card>
+                <sl-table>
+                    <thead>
+                        <tr>
+                            <th>版本</th>
+                            <th>盤查年份</th>
+                            <th>送審日期</th>
+                            <th>總排放量 (tCO2e)</th>
+                            <th>狀態</th>
+                            <th>審核人</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>v2.0</strong></td>
+                            <td>2024</td>
+                            [cite_start]<td>2025-04-11 [cite: 8]</td>
+                            <td>105,432.89</td>
+                            <td><sl-tag variant="primary">審核中</sl-tag></td>
+                            <td>System</td>
+                            <td><sl-button size="small" outline>檢視</sl-button></td>
+                        </tr>
+                        <tr>
+                            <td>v1.0</td>
+                            <td>2023</td>
+                            <td>2024-05-20</td>
+                            <td>98,120.00</td>
+                            <td><sl-tag variant="success">已通過</sl-tag></td>
+                            <td>ISO 查驗員</td>
+                            <td><sl-button size="small" outline>下載證書</sl-button></td>
+                        </tr>
+                    </tbody>
+                </sl-table>
+            </sl-card>
+        </div>
+
+    </main>
+
+    <sl-drawer label="新增盤查數據" class="drawer-add" placement="end" style="--size: 500px;">
+        <form class="input-form" onsubmit="event.preventDefault(); alert('資料已暫存！'); document.querySelector('.drawer-add').hide();">
+            
+            <sl-select label="範疇分類" name="scope" required>
+                <sl-option value="scope1">範疇一 (Scope 1)</sl-option>
+                <sl-option value="scope2">範疇二 (Scope 2)</sl-option>
+                <sl-option value="scope3">範疇三 (Scope 3)</sl-option>
+            </sl-select>
+            <br>
+            
+            <sl-input label="排放源名稱" placeholder="例如：移動設備 A-01" required></sl-input>
+            <br>
+            
+            <div class="grid-2" style="margin-bottom: 0;">
+                <sl-select label="燃料/物質種類" required>
+                    [cite_start]<sl-option value="diesel">柴油 [cite: 28]</sl-option>
+                    [cite_start]<sl-option value="gasoline">汽油 [cite: 31]</sl-option>
+                    [cite_start]<sl-option value="r410a">R-410A [cite: 40]</sl-option>
+                </sl-select>
+                
+                <sl-select label="單位" value="L">
+                    <sl-option value="L">公升 (L)</sl-option>
+                    <sl-option value="kg">公斤 (kg)</sl-option>
+                    <sl-option value="kWh">度 (kWh)</sl-option>
+                    <sl-option value="km">公里 (km)</sl-option>
+                </sl-select>
+            </div>
+            <br>
+
+            <sl-input type="number" label="活動數據 (用量)" placeholder="0.00" required></sl-input>
+            <br>
+            
+            <sl-input label="引用係數 (預設)" value="2.6811 kgCO2/L" disabled filled>
+                <sl-icon name="info-circle" slot="suffix"></sl-icon>
+            </sl-input>
+            <br>
+            
+            <sl-textarea label="備註 / 佐證文件" placeholder="輸入發票號碼或檔案名稱..."></sl-textarea>
+            <br>
+            
+            <sl-button type="submit" variant="primary" style="width: 100%;">儲存數據</sl-button>
+        </form>
+    </sl-drawer>
+
+    <script>
+        // 切換視圖的簡單邏輯
+        function navigateTo(viewId) {
+            // 1. 隱藏所有視圖
+            document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+            // 2. 顯示目標視圖
+            const target = document.getElementById(viewId);
+            if(target) target.classList.add('active');
+            
+            // 3. 更新左側選單的選中狀態 (Visual Feedback)
+            document.querySelectorAll('sl-menu-item').forEach(item => {
+                if(item.getAttribute('value') === viewId) {
+                    item.setAttribute('checked', '');
+                } else {
+                    item.removeAttribute('checked');
+                }
+            });
+        }
+
+        // 開啟抽屜
+        function openDrawer() {
+            const drawer = document.querySelector('.drawer-add');
+            drawer.show();
+        }
+    </script>
+</body>
+</html>

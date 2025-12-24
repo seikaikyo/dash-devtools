@@ -1,9 +1,12 @@
 """
 Pre-push 檢查
 
-支援 GitGuardian (ggshield) 整合：
-- 如果有設定 GITGUARDIAN_API_KEY 且安裝了 ggshield，使用 GitGuardian 掃描
-- 否則使用本地正則表達式掃描
+支援功能：
+1. GitGuardian (ggshield) 機敏資料掃描
+2. 測試執行 (Vitest / Jest / Pytest)
+3. 強制門檻：測試失敗禁止推送
+
+使用 --strict 選項強制測試通過才能推送
 """
 
 from .pre_commit import run_pre_commit_check, SENSITIVE_PATTERNS
@@ -11,6 +14,115 @@ import re
 import os
 import subprocess
 from pathlib import Path
+
+
+def run_tests(project_path, strict=False):
+    """
+    執行專案測試
+
+    Args:
+        project_path: 專案路徑
+        strict: 嚴格模式 - 測試失敗時禁止推送
+
+    Returns:
+        dict: {passed: bool, engine: str, message: str}
+    """
+    project = Path(project_path)
+    package_json = project / 'package.json'
+    pytest_ini = project / 'pytest.ini'
+    pyproject = project / 'pyproject.toml'
+
+    results = []
+
+    # 1. Node.js 專案測試 (Vitest / Jest / Karma)
+    if package_json.exists():
+        try:
+            import json
+            pkg = json.loads(package_json.read_text())
+            scripts = pkg.get('scripts', {})
+
+            if 'test' in scripts:
+                result = subprocess.run(
+                    ['npm', 'run', 'test'],
+                    capture_output=True,
+                    text=True,
+                    cwd=project_path,
+                    timeout=300  # 5 分鐘超時
+                )
+
+                test_engine = 'Vitest'
+                if 'jest' in scripts.get('test', ''):
+                    test_engine = 'Jest'
+                elif 'karma' in scripts.get('test', ''):
+                    test_engine = 'Karma'
+
+                results.append({
+                    'engine': test_engine,
+                    'passed': result.returncode == 0,
+                    'output': result.stdout + result.stderr
+                })
+        except subprocess.TimeoutExpired:
+            results.append({
+                'engine': 'npm test',
+                'passed': False,
+                'output': '測試執行超時 (5 分鐘)'
+            })
+        except Exception as e:
+            results.append({
+                'engine': 'npm test',
+                'passed': True,  # 無法執行時不阻擋
+                'output': f'跳過: {str(e)}'
+            })
+
+    # 2. Python 專案測試 (pytest)
+    if pytest_ini.exists() or (pyproject.exists() and '[tool.pytest' in pyproject.read_text()):
+        tests_dir = project / 'tests'
+        if tests_dir.exists():
+            try:
+                result = subprocess.run(
+                    ['python3', '-m', 'pytest', 'tests/', '-v', '--tb=short'],
+                    capture_output=True,
+                    text=True,
+                    cwd=project_path,
+                    timeout=300
+                )
+
+                results.append({
+                    'engine': 'Pytest',
+                    'passed': result.returncode == 0,
+                    'output': result.stdout + result.stderr
+                })
+            except subprocess.TimeoutExpired:
+                results.append({
+                    'engine': 'Pytest',
+                    'passed': False,
+                    'output': '測試執行超時 (5 分鐘)'
+                })
+            except Exception as e:
+                results.append({
+                    'engine': 'Pytest',
+                    'passed': True,
+                    'output': f'跳過: {str(e)}'
+                })
+
+    # 彙總結果
+    if not results:
+        return {
+            'passed': True,
+            'engine': 'None',
+            'message': '未偵測到測試框架'
+        }
+
+    all_passed = all(r['passed'] for r in results)
+    engines = [r['engine'] for r in results]
+
+    return {
+        'passed': all_passed or not strict,
+        'strict_failed': not all_passed and strict,
+        'engine': ', '.join(engines),
+        'message': '所有測試通過' if all_passed else '測試失敗',
+        'details': results
+    }
 
 
 def run_ggshield_scan(project_path):

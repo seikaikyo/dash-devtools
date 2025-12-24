@@ -342,6 +342,174 @@ def dbdiagram(project, do_copy, do_open, save):
 
 
 # ============================================================
+# 資料庫遷移指令
+# ============================================================
+
+@main.group()
+def db():
+    """資料庫遷移管理 (Alembic)
+
+    子指令：
+      init      初始化 Alembic
+      status    檢視遷移狀態
+      generate  產生新的遷移檔
+      upgrade   升級到最新版本
+      downgrade 降級到指定版本
+    """
+    pass
+
+
+@db.command()
+@click.argument('project', type=click.Path(exists=True), default='.')
+def init(project):
+    """初始化 Alembic 遷移環境
+
+    使用範例：
+      dash db init .
+      dash db init /path/to/project
+    """
+    from .database import init_alembic
+
+    console.print("[cyan]初始化 Alembic...[/cyan]")
+    result = init_alembic(project)
+
+    if result['success']:
+        console.print("[green]✓ Alembic 初始化完成[/green]")
+        console.print(f"  [dim]已建立: {result.get('alembic_dir')}[/dim]")
+    else:
+        console.print(f"[red]✗ 初始化失敗: {result.get('error')}[/red]")
+        raise SystemExit(1)
+
+
+@db.command('status')
+@click.argument('project', type=click.Path(exists=True), default='.')
+def db_status(project):
+    """檢視遷移狀態
+
+    顯示：
+    - 目前資料庫版本
+    - 待套用的遷移
+    - Model 與遷移是否同步
+
+    使用範例：
+      dash db status .
+    """
+    from .database import get_migration_status
+
+    console.print("[cyan]檢查遷移狀態...[/cyan]")
+    result = get_migration_status(project)
+
+    if not result['success']:
+        console.print(f"[red]✗ {result.get('error')}[/red]")
+        raise SystemExit(1)
+
+    console.print(f"  目前版本: [cyan]{result.get('current', 'N/A')}[/cyan]")
+    console.print(f"  最新版本: [cyan]{result.get('head', 'N/A')}[/cyan]")
+
+    pending = result.get('pending', [])
+    if pending:
+        console.print(f"\n  [yellow]待套用遷移 ({len(pending)}):[/yellow]")
+        for p in pending:
+            console.print(f"    • {p}")
+    else:
+        console.print("\n  [green]✓ 已是最新版本[/green]")
+
+
+@db.command()
+@click.argument('project', type=click.Path(exists=True), default='.')
+@click.option('--message', '-m', required=True, help='遷移描述')
+@click.option('--autogenerate', '-a', is_flag=True, default=True, help='自動偵測 Model 變更')
+def generate(project, message, autogenerate):
+    """產生新的遷移檔
+
+    使用範例：
+      dash db generate . -m "add user table"
+      dash db generate . -m "add index to email"
+    """
+    from .database import generate_migration
+
+    console.print(f"[cyan]產生遷移: {message}[/cyan]")
+    result = generate_migration(project, message, autogenerate=autogenerate)
+
+    if result['success']:
+        console.print("[green]✓ 遷移檔已產生[/green]")
+        console.print(f"  [dim]{result.get('migration_file')}[/dim]")
+
+        # 安全檢查
+        if result.get('warnings'):
+            console.print("\n[yellow]警告:[/yellow]")
+            for w in result['warnings']:
+                console.print(f"  [yellow]• {w}[/yellow]")
+    else:
+        console.print(f"[red]✗ 產生失敗: {result.get('error')}[/red]")
+        raise SystemExit(1)
+
+
+@db.command()
+@click.argument('project', type=click.Path(exists=True), default='.')
+@click.option('--revision', '-r', default='head', help='目標版本 (預設: head)')
+@click.option('--dry-run', is_flag=True, help='預覽模式，顯示 SQL 但不執行')
+def upgrade(project, revision, dry_run):
+    """升級資料庫到指定版本
+
+    使用範例：
+      dash db upgrade .
+      dash db upgrade . -r abc123
+      dash db upgrade . --dry-run
+    """
+    from .database import run_upgrade
+
+    if dry_run:
+        console.print(f"[yellow]預覽模式 - 升級到 {revision}[/yellow]")
+    else:
+        console.print(f"[cyan]升級資料庫到 {revision}...[/cyan]")
+
+    result = run_upgrade(project, revision, dry_run=dry_run)
+
+    if result['success']:
+        if dry_run:
+            console.print("\n[dim]將執行的 SQL:[/dim]")
+            console.print(result.get('sql', '(無變更)'))
+        else:
+            console.print("[green]✓ 升級完成[/green]")
+            console.print(f"  [dim]新版本: {result.get('current')}[/dim]")
+    else:
+        console.print(f"[red]✗ 升級失敗: {result.get('error')}[/red]")
+        raise SystemExit(1)
+
+
+@db.command()
+@click.argument('project', type=click.Path(exists=True), default='.')
+@click.option('--revision', '-r', required=True, help='目標版本')
+@click.option('--confirm', is_flag=True, help='確認執行危險操作')
+def downgrade(project, revision, confirm):
+    """降級資料庫到指定版本
+
+    危險操作！會刪除資料。
+
+    使用範例：
+      dash db downgrade . -r abc123 --confirm
+      dash db downgrade . -r -1 --confirm  # 降一個版本
+    """
+    from .database import run_downgrade
+
+    if not confirm:
+        console.print("[red]危險操作！降級可能導致資料遺失。[/red]")
+        console.print("[yellow]請加上 --confirm 確認執行[/yellow]")
+        raise SystemExit(1)
+
+    console.print(f"[yellow]降級資料庫到 {revision}...[/yellow]")
+    result = run_downgrade(project, revision)
+
+    if result['success']:
+        console.print("[green]✓ 降級完成[/green]")
+        console.print(f"  [dim]新版本: {result.get('current')}[/dim]")
+    else:
+        console.print(f"[red]✗ 降級失敗: {result.get('error')}[/red]")
+        raise SystemExit(1)
+
+
+# ============================================================
 # 新功能 v2.0
 # ============================================================
 
@@ -514,6 +682,198 @@ def watch(project, auto_fix, interval):
     from .watch import run_watch
 
     run_watch(project, auto_fix=auto_fix, interval=interval)
+
+
+# ============================================================
+# AI 引擎指令
+# ============================================================
+
+@main.group()
+def ai():
+    """AI 程式碼助手 (Gemini)
+
+    使用 Google Generative AI SDK。
+    需設定環境變數 GEMINI_API_KEY。
+
+    子指令：
+      analyze   分析程式碼
+      fix       建議修復方案
+      test      生成測試
+      explain   解釋程式碼
+      review    審查 commit
+    """
+    pass
+
+
+@ai.command()
+@click.argument('file', type=click.Path(exists=True))
+@click.option('--focus', '-f', type=click.Choice(['general', 'security', 'performance', 'quality']),
+              default='general', help='分析重點')
+def analyze(file, focus):
+    """分析程式碼
+
+    使用範例：
+      dash ai analyze src/main.py
+      dash ai analyze src/api.ts --focus security
+    """
+    try:
+        from .ai_engine import get_ai
+        ai_engine = get_ai()
+
+        with open(file, 'r', encoding='utf-8') as f:
+            code = f.read()
+
+        console.print(f"[cyan]分析中: {file}[/cyan]")
+        console.print(f"[dim]重點: {focus}[/dim]\n")
+
+        response = ai_engine.analyze_code(code, focus=focus)
+        if response.success:
+            console.print(response.content)
+        else:
+            console.print(f"[red]錯誤: {response.error}[/red]")
+    except ImportError as e:
+        console.print(f"[red]需要安裝 AI 套件: pip install dash-devtools[ai][/red]")
+        console.print(f"[dim]{e}[/dim]")
+    except ValueError as e:
+        console.print(f"[red]{e}[/red]")
+
+
+@ai.command()
+@click.argument('file', type=click.Path(exists=True))
+@click.option('--error', '-e', required=True, help='錯誤訊息')
+def fix(file, error):
+    """建議修復方案
+
+    使用範例：
+      dash ai fix src/main.py -e "TypeError: Cannot read property"
+    """
+    try:
+        from .ai_engine import get_ai
+        ai_engine = get_ai()
+
+        with open(file, 'r', encoding='utf-8') as f:
+            code = f.read()
+
+        console.print(f"[cyan]分析錯誤: {file}[/cyan]\n")
+
+        response = ai_engine.suggest_fix(code, error)
+        if response.success:
+            console.print(response.content)
+        else:
+            console.print(f"[red]錯誤: {response.error}[/red]")
+    except ImportError:
+        console.print(f"[red]需要安裝 AI 套件: pip install dash-devtools[ai][/red]")
+    except ValueError as e:
+        console.print(f"[red]{e}[/red]")
+
+
+@ai.command('test')
+@click.argument('file', type=click.Path(exists=True))
+@click.option('--framework', '-f', default='auto', help='測試框架 (auto/pytest/jest/vitest)')
+@click.option('--coverage', '-c', type=click.Choice(['basic', 'comprehensive', 'edge-cases']),
+              default='comprehensive', help='覆蓋範圍')
+def generate_test(file, framework, coverage):
+    """生成測試程式碼
+
+    使用範例：
+      dash ai test src/utils.py
+      dash ai test src/api.ts --framework jest
+    """
+    try:
+        from .ai_engine import get_ai
+        ai_engine = get_ai()
+
+        with open(file, 'r', encoding='utf-8') as f:
+            code = f.read()
+
+        console.print(f"[cyan]產生測試: {file}[/cyan]\n")
+
+        response = ai_engine.generate_tests(code, framework=framework, coverage=coverage)
+        if response.success:
+            console.print(response.content)
+        else:
+            console.print(f"[red]錯誤: {response.error}[/red]")
+    except ImportError:
+        console.print(f"[red]需要安裝 AI 套件: pip install dash-devtools[ai][/red]")
+    except ValueError as e:
+        console.print(f"[red]{e}[/red]")
+
+
+@ai.command()
+@click.argument('file', type=click.Path(exists=True))
+@click.option('--detail', '-d', type=click.Choice(['brief', 'medium', 'detailed']),
+              default='medium', help='詳細程度')
+def explain(file, detail):
+    """解釋程式碼
+
+    使用範例：
+      dash ai explain src/complex-algo.py
+      dash ai explain src/auth.ts --detail detailed
+    """
+    try:
+        from .ai_engine import get_ai
+        ai_engine = get_ai()
+
+        with open(file, 'r', encoding='utf-8') as f:
+            code = f.read()
+
+        console.print(f"[cyan]解釋: {file}[/cyan]\n")
+
+        response = ai_engine.explain_code(code, detail_level=detail)
+        if response.success:
+            console.print(response.content)
+        else:
+            console.print(f"[red]錯誤: {response.error}[/red]")
+    except ImportError:
+        console.print(f"[red]需要安裝 AI 套件: pip install dash-devtools[ai][/red]")
+    except ValueError as e:
+        console.print(f"[red]{e}[/red]")
+
+
+@ai.command()
+@click.argument('project', type=click.Path(exists=True), default='.')
+def review(project):
+    """審查最新 commit
+
+    使用範例：
+      dash ai review .
+    """
+    import subprocess
+    try:
+        from .ai_engine import get_ai
+        ai_engine = get_ai()
+
+        # 取得最新 commit 的 diff
+        result = subprocess.run(
+            ['git', 'diff', 'HEAD~1', 'HEAD'],
+            cwd=project,
+            capture_output=True,
+            text=True
+        )
+        diff = result.stdout
+
+        # 取得 commit message
+        msg_result = subprocess.run(
+            ['git', 'log', '-1', '--pretty=%B'],
+            cwd=project,
+            capture_output=True,
+            text=True
+        )
+        commit_msg = msg_result.stdout.strip()
+
+        console.print(f"[cyan]審查 commit: {commit_msg[:50]}...[/cyan]\n")
+
+        response = ai_engine.review_commit(diff, commit_msg)
+        if response.success:
+            console.print(response.content)
+        else:
+            console.print(f"[red]錯誤: {response.error}[/red]")
+    except ImportError:
+        console.print(f"[red]需要安裝 AI 套件: pip install dash-devtools[ai][/red]")
+    except ValueError as e:
+        console.print(f"[red]{e}[/red]")
+    except Exception as e:
+        console.print(f"[red]錯誤: {e}[/red]")
 
 
 if __name__ == '__main__':

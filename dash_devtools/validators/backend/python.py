@@ -90,6 +90,7 @@ class PythonValidator:
         self.check_dependencies()
         self.check_model_files()
         self.check_virtual_env()
+        self.check_migrations()
 
         return self.result
 
@@ -319,6 +320,58 @@ class PythonValidator:
 
         if has_venv and not venv_ignored:
             self.result['warnings'].append('虛擬環境目錄未加入 .gitignore')
+
+    def check_migrations(self):
+        """檢查資料庫遷移狀態"""
+        alembic_ini = self.project_path / 'alembic.ini'
+        alembic_dir = self.project_path / 'alembic'
+
+        # 跳過非 Alembic 專案
+        if not alembic_ini.exists():
+            self.result['checks']['migrations'] = {'skipped': 'Alembic 未初始化'}
+            return
+
+        versions_dir = alembic_dir / 'versions'
+        has_migrations = versions_dir.exists() and any(versions_dir.glob('*.py'))
+
+        # 檢查 Model 檔案
+        models_files = []
+        for pattern in ['**/models.py', '**/models/*.py', '**/models/**/*.py']:
+            models_files.extend(self.project_path.glob(pattern))
+
+        # 過濾掉 alembic/versions 目錄
+        models_files = [f for f in models_files if 'alembic' not in str(f)]
+
+        # 取得最新 migration 時間
+        latest_migration_time = 0
+        if versions_dir.exists():
+            for f in versions_dir.glob('*.py'):
+                if f.stat().st_mtime > latest_migration_time:
+                    latest_migration_time = f.stat().st_mtime
+
+        # 取得最新 model 修改時間
+        latest_model_time = 0
+        for f in models_files:
+            if f.stat().st_mtime > latest_model_time:
+                latest_model_time = f.stat().st_mtime
+
+        # 比較時間
+        needs_migration = latest_model_time > latest_migration_time and latest_migration_time > 0
+
+        self.result['checks']['migrations'] = {
+            'has_alembic': True,
+            'has_migrations': has_migrations,
+            'models_count': len(models_files),
+            'needs_migration': needs_migration
+        }
+
+        if not has_migrations:
+            self.result['warnings'].append('Alembic 已初始化但尚未有遷移檔，請執行 dash db generate')
+
+        if needs_migration:
+            self.result['warnings'].append(
+                'Model 檔案比最新遷移更新，可能需要產生新遷移 (dash db generate -m "描述")'
+            )
 
     def _should_skip(self, file_path):
         """檢查是否應該跳過該檔案"""
