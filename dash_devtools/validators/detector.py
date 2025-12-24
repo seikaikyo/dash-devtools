@@ -1,10 +1,14 @@
 """
-專案類型偵測器
+專案類型偵測器 v2.0
 
 自動偵測專案的技術堆疊：
-- 前端：Angular / Vite / 原生 JS
-- 後端：Node.js / Python
-- 混合專案
+- 前端：Angular / Vue+Vite / React / Vanilla JS
+- 後端：Node.js / Python (FastAPI/Flask/Django)
+- 部署：Vercel Serverless / Vercel Proxy / Render
+
+新增功能：
+- 區分「Serverless API」與「純 Proxy 閘道」
+- 偵測 Vue 3 + DaisyUI 組合
 """
 
 import json
@@ -27,6 +31,7 @@ class ProjectDetector:
             'frontend': None,
             'backend': None,
             'ui_framework': None,
+            'deployment': None,
             'details': {}
         }
 
@@ -44,6 +49,12 @@ class ProjectDetector:
             result['types'].add('backend')
             result['backend'] = backend['type']
             result['details']['backend'] = backend
+
+        # 偵測部署模式
+        deployment = self._detect_deployment()
+        if deployment:
+            result['deployment'] = deployment
+            result['details']['deployment'] = deployment
 
         # 轉換 set 為 list（JSON 序列化用）
         result['types'] = list(result['types'])
@@ -66,8 +77,6 @@ class ProjectDetector:
                 ui_framework = None
                 if 'primeng' in deps:
                     ui_framework = 'primeng'
-                elif '@pxblue/angular-components' in deps:
-                    ui_framework = 'pxblue'
 
                 return {
                     'type': 'angular',
@@ -76,7 +85,23 @@ class ProjectDetector:
                     'has_tailwind': 'tailwindcss' in deps
                 }
 
-            # Vite 偵測
+            # Vue + Vite 偵測
+            if 'vue' in deps:
+                ui_framework = None
+                if 'daisyui' in deps:
+                    ui_framework = 'daisyui'
+                elif '@shoelace-style/shoelace' in deps:
+                    ui_framework = 'shoelace'
+
+                return {
+                    'type': 'vue-vite' if 'vite' in deps else 'vue',
+                    'version': deps.get('vue', 'unknown'),
+                    'ui_framework': ui_framework,
+                    'has_tailwind': 'tailwindcss' in deps or '@tailwindcss/vite' in deps,
+                    'has_typescript': 'typescript' in deps or 'vue-tsc' in deps
+                }
+
+            # Vite (非 Vue)
             if 'vite' in deps:
                 ui_framework = None
                 if 'daisyui' in deps:
@@ -97,13 +122,6 @@ class ProjectDetector:
                     'type': 'react',
                     'version': deps.get('react', 'unknown'),
                     'ui_framework': self._detect_react_ui(deps)
-                }
-
-            # Vue 偵測
-            if 'vue' in deps:
-                return {
-                    'type': 'vue',
-                    'version': deps.get('vue', 'unknown')
                 }
 
             # 原生 JS（有 package.json 但無框架）
@@ -141,7 +159,6 @@ class ProjectDetector:
 
     def _detect_python_backend(self) -> dict | None:
         """偵測 Python 後端"""
-        # 檢查 requirements.txt
         requirements = self.project_path / 'requirements.txt'
         pyproject = self.project_path / 'pyproject.toml'
         setup_py = self.project_path / 'setup.py'
@@ -183,15 +200,15 @@ class ProjectDetector:
             pkg = json.loads(package_json.read_text(encoding='utf-8'))
             deps = {**pkg.get('dependencies', {}), **pkg.get('devDependencies', {})}
 
-            # Vercel Serverless 偵測
-            vercel_json = self.project_path / 'vercel.json'
+            # Vercel Serverless 偵測（有 api/ 目錄且有函數檔案）
             api_dir = self.project_path / 'api'
-
-            if vercel_json.exists() or api_dir.exists():
-                return {
-                    'type': 'nodejs',
-                    'framework': 'vercel-serverless'
-                }
+            if api_dir.exists():
+                api_files = list(api_dir.rglob('*.js')) + list(api_dir.rglob('*.ts'))
+                if api_files:
+                    return {
+                        'type': 'nodejs',
+                        'framework': 'vercel-serverless'
+                    }
 
             # Express 偵測
             if 'express' in deps:
@@ -219,21 +236,105 @@ class ProjectDetector:
 
         return None
 
+    def _detect_deployment(self) -> dict | None:
+        """偵測部署模式"""
+        vercel_json = self.project_path / 'vercel.json'
+
+        if not vercel_json.exists():
+            return None
+
+        try:
+            config = json.loads(vercel_json.read_text(encoding='utf-8'))
+            rewrites = config.get('rewrites', [])
+
+            # 檢查是否為純 Proxy 模式
+            is_proxy_only = False
+            proxy_target = None
+
+            for rewrite in rewrites:
+                dest = rewrite.get('destination', '')
+                source = rewrite.get('source', '')
+
+                # 如果 destination 是外部 URL，則是 Proxy
+                if dest.startswith('http://') or dest.startswith('https://'):
+                    is_proxy_only = True
+                    proxy_target = dest.split('/')[2]  # 取得域名
+
+            # 檢查是否有 api/ 目錄（Serverless）
+            api_dir = self.project_path / 'api'
+            has_api_functions = api_dir.exists() and any(api_dir.rglob('*.ts')) or any(api_dir.rglob('*.js'))
+
+            if is_proxy_only and not has_api_functions:
+                return {
+                    'type': 'vercel-proxy',
+                    'proxy_target': proxy_target,
+                    'description': '純前端 + API 代理'
+                }
+            elif has_api_functions:
+                return {
+                    'type': 'vercel-serverless',
+                    'has_proxy': is_proxy_only,
+                    'description': 'Serverless Functions' + (' + Proxy' if is_proxy_only else '')
+                }
+            else:
+                return {
+                    'type': 'vercel-static',
+                    'description': '純靜態網站'
+                }
+
+        except Exception:
+            pass
+
+        return None
+
     def get_applicable_validators(self) -> Set[str]:
         """取得適用的驗證器類型"""
         info = self.detect()
         validators = {'common'}  # 通用驗證器永遠適用
 
-        if info['frontend'] == 'angular':
+        frontend_type = info['frontend']
+        if frontend_type == 'angular':
             validators.add('frontend.angular')
-        elif info['frontend'] in ['vite', 'vanilla']:
+        elif frontend_type in ['vite', 'vanilla', 'vue-vite', 'vue']:
             validators.add('frontend.vite')
-        elif info['frontend'] == 'react':
+        elif frontend_type == 'react':
             validators.add('frontend.react')
 
-        if info['backend'] == 'python':
+        backend_type = info['backend']
+        if backend_type == 'python':
             validators.add('backend.python')
-        elif info['backend'] == 'nodejs':
+        elif backend_type == 'nodejs':
             validators.add('backend.nodejs')
 
         return validators
+
+    def get_project_summary(self) -> str:
+        """取得專案摘要（供 CLI 顯示）"""
+        info = self.detect()
+
+        parts = []
+
+        # 前端
+        if info['frontend']:
+            frontend_str = info['frontend']
+            if info['ui_framework']:
+                frontend_str += f" + {info['ui_framework']}"
+            parts.append(f"Frontend: {frontend_str}")
+
+        # 後端
+        if info['backend']:
+            backend = info['details'].get('backend', {})
+            framework = backend.get('framework', '')
+            backend_str = f"{info['backend']}"
+            if framework:
+                backend_str += f" ({framework})"
+            parts.append(f"Backend: {backend_str}")
+
+        # 部署
+        if info['deployment']:
+            deploy = info['deployment']
+            parts.append(f"Deploy: {deploy.get('type', 'unknown')}")
+            if deploy.get('proxy_target'):
+                parts.append(f"Proxy: {deploy['proxy_target']}")
+
+        return ' | '.join(parts) if parts else 'Unknown project type'
