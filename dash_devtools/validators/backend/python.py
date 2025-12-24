@@ -1,33 +1,36 @@
 """
-Python 後端驗證器
+Python 後端驗證器 v2.0
+
+支援：
+- FastAPI 專案結構驗證
+- Ruff 整合 (lint + format)
+- 程式碼風格檢查
 
 檢查項目：
-1. 程式碼風格 (PEP 8)
-2. 依賴管理 (requirements.txt / pyproject.toml)
-3. 模型權重檔案 (.pt, .pth, .onnx)
-4. 虛擬環境設定
-5. AI/ML 套件相容性
+1. FastAPI 結構 (main.py, routers/, etc.)
+2. Ruff lint/format 檢查
+3. 依賴管理 (requirements.txt / pyproject.toml)
+4. 模型權重檔案
+5. 虛擬環境設定
 """
 
 import re
+import subprocess
 from pathlib import Path
 
 
 class PythonValidator:
-    """Python 後端驗證器"""
+    """Python 後端驗證器 (支援 FastAPI + Ruff)"""
 
     name = 'python'
 
-    # 忽略目錄
     IGNORE_DIRS = [
         '__pycache__', '.git', 'venv', '.venv', 'env', '.env',
         'dist', 'build', '.eggs', '*.egg-info', '.pytest_cache'
     ]
 
-    # 模型權重副檔名（應加入 .gitignore）
     MODEL_EXTENSIONS = ['.pt', '.pth', '.onnx', '.h5', '.pkl', '.joblib', '.safetensors']
 
-    # 常見 AI/ML 套件
     AI_PACKAGES = {
         'torch': 'PyTorch',
         'tensorflow': 'TensorFlow',
@@ -47,6 +50,29 @@ class PythonValidator:
             'warnings': [],
             'checks': {}
         }
+        # 偵測框架
+        self.framework = self._detect_framework()
+
+    def _detect_framework(self) -> str | None:
+        """偵測 Python 框架"""
+        requirements = self.project_path / 'requirements.txt'
+        pyproject = self.project_path / 'pyproject.toml'
+
+        content = ''
+        if requirements.exists():
+            content = requirements.read_text(encoding='utf-8').lower()
+        elif pyproject.exists():
+            content = pyproject.read_text(encoding='utf-8').lower()
+
+        if 'fastapi' in content:
+            return 'fastapi'
+        if 'flask' in content:
+            return 'flask'
+        if 'django' in content:
+            return 'django'
+        if 'streamlit' in content:
+            return 'streamlit'
+        return None
 
     def run(self):
         """執行所有驗證"""
@@ -55,13 +81,164 @@ class PythonValidator:
             self.result['errors'].append(f'專案路徑不存在: {self.project_path}')
             return self.result
 
+        # 框架特定檢查
+        if self.framework == 'fastapi':
+            self.check_fastapi_structure()
+
+        # 通用檢查
+        self.check_ruff()
         self.check_dependencies()
         self.check_model_files()
         self.check_virtual_env()
-        self.check_code_style()
-        self.check_ai_packages()
 
         return self.result
+
+    def check_fastapi_structure(self):
+        """檢查 FastAPI 專案結構"""
+        issues = []
+
+        # 檢查入口點
+        main_py = self.project_path / 'main.py'
+        app_main_py = self.project_path / 'app' / 'main.py'
+
+        has_main = main_py.exists() or app_main_py.exists()
+        main_file = main_py if main_py.exists() else app_main_py
+
+        if not has_main:
+            issues.append('缺少 main.py 入口點')
+
+        # 檢查 main.py 內容
+        if has_main:
+            try:
+                content = main_file.read_text(encoding='utf-8')
+
+                # 檢查 FastAPI 實例
+                if 'FastAPI()' not in content and 'FastAPI(' not in content:
+                    issues.append('main.py 中未找到 FastAPI 實例')
+
+                # 檢查 CORS 設定
+                if 'CORSMiddleware' not in content:
+                    issues.append('建議加入 CORS 設定')
+
+                # 檢查全域錯誤處理
+                if '@app.exception_handler' not in content and 'exception_handler' not in content:
+                    issues.append('建議加入全域錯誤處理')
+
+            except Exception:
+                pass
+
+        # 檢查 requirements.txt
+        requirements = self.project_path / 'requirements.txt'
+        if not requirements.exists():
+            issues.append('缺少 requirements.txt')
+
+        # 檢查目錄結構
+        app_dir = self.project_path / 'app'
+        routers_dir = app_dir / 'routers' if app_dir.exists() else self.project_path / 'routers'
+
+        self.result['checks']['fastapi_structure'] = {
+            'has_main': has_main,
+            'has_requirements': requirements.exists(),
+            'has_app_dir': app_dir.exists(),
+            'has_routers': routers_dir.exists(),
+            'issues': issues
+        }
+
+        for issue in issues:
+            if '缺少' in issue:
+                self.result['errors'].append(f'FastAPI: {issue}')
+            else:
+                self.result['warnings'].append(f'FastAPI: {issue}')
+
+    def check_ruff(self):
+        """執行 Ruff lint 和 format 檢查"""
+        # 檢查 ruff 是否安裝
+        try:
+            result = subprocess.run(
+                ['ruff', '--version'],
+                capture_output=True,
+                text=True
+            )
+            if result.returncode != 0:
+                self.result['checks']['ruff'] = {'skipped': 'Ruff 未安裝'}
+                return
+        except FileNotFoundError:
+            self.result['checks']['ruff'] = {'skipped': 'Ruff 未安裝'}
+            return
+
+        lint_issues = []
+        format_issues = []
+
+        # 執行 ruff check
+        try:
+            result = subprocess.run(
+                ['ruff', 'check', str(self.project_path), '--output-format=json'],
+                capture_output=True,
+                text=True,
+                timeout=60
+            )
+
+            if result.stdout:
+                import json
+                try:
+                    issues = json.loads(result.stdout)
+                    for issue in issues[:10]:  # 只取前 10 個
+                        lint_issues.append({
+                            'file': issue.get('filename', ''),
+                            'line': issue.get('location', {}).get('row', 0),
+                            'code': issue.get('code', ''),
+                            'message': issue.get('message', '')
+                        })
+                except json.JSONDecodeError:
+                    pass
+
+        except subprocess.TimeoutExpired:
+            self.result['checks']['ruff'] = {'error': 'Ruff check 執行逾時'}
+            return
+        except Exception as e:
+            self.result['checks']['ruff'] = {'error': str(e)}
+            return
+
+        # 執行 ruff format --check
+        try:
+            result = subprocess.run(
+                ['ruff', 'format', '--check', str(self.project_path)],
+                capture_output=True,
+                text=True,
+                timeout=60
+            )
+
+            if result.returncode != 0:
+                # 解析需要格式化的檔案
+                for line in result.stdout.splitlines():
+                    if line.strip().startswith('Would reformat'):
+                        file_name = line.replace('Would reformat', '').strip()
+                        format_issues.append(file_name)
+                    elif line.strip() and not line.startswith('Oh no!') and not line.startswith('1 file'):
+                        # 其他格式的輸出
+                        format_issues.append(line.strip())
+
+        except subprocess.TimeoutExpired:
+            pass
+        except Exception:
+            pass
+
+        self.result['checks']['ruff'] = {
+            'lint_issues': len(lint_issues),
+            'format_issues': len(format_issues),
+            'lint_details': lint_issues[:5],
+            'format_details': format_issues[:5]
+        }
+
+        if lint_issues:
+            self.result['warnings'].append(f'Ruff lint: {len(lint_issues)} 個問題')
+            for issue in lint_issues[:3]:
+                self.result['warnings'].append(
+                    f"  {issue['file']}:{issue['line']} [{issue['code']}] {issue['message'][:50]}"
+                )
+
+        if format_issues:
+            self.result['warnings'].append(f'Ruff format: {len(format_issues)} 個檔案需要格式化')
 
     def check_dependencies(self):
         """檢查依賴管理"""
@@ -80,17 +257,15 @@ class PythonValidator:
         if not has_deps:
             self.result['warnings'].append('缺少依賴管理檔案 (requirements.txt 或 pyproject.toml)')
 
-        # 檢查 requirements.txt 是否有版本鎖定
+        # 檢查 requirements.txt 版本鎖定
         if requirements.exists():
             content = requirements.read_text(encoding='utf-8')
             lines = [l.strip() for l in content.splitlines() if l.strip() and not l.startswith('#')]
             unpinned = []
 
             for line in lines:
-                # 排除 -e, git+, http:// 等特殊格式
                 if line.startswith('-') or line.startswith('git+') or '://' in line:
                     continue
-                # 檢查是否有版本指定
                 if '==' not in line and '>=' not in line and '<=' not in line:
                     pkg_name = re.split(r'[<>=\[]', line)[0]
                     unpinned.append(pkg_name)
@@ -109,7 +284,6 @@ class PythonValidator:
             for f in self.project_path.rglob(f'*{ext}'):
                 if self._should_skip(f):
                     continue
-                # 檢查是否在 .gitignore 中
                 if not self._is_gitignored(f):
                     issues.append({
                         'file': str(f.relative_to(self.project_path)),
@@ -125,15 +299,12 @@ class PythonValidator:
             self.result['warnings'].append(
                 f'模型權重檔案未忽略: {len(issues)} 個 (建議加入 .gitignore)'
             )
-            for issue in issues[:3]:
-                self.result['warnings'].append(f"  • {issue['file']}")
 
     def check_virtual_env(self):
         """檢查虛擬環境設定"""
         venv_dirs = ['venv', '.venv', 'env', '.env']
         has_venv = any((self.project_path / d).exists() for d in venv_dirs)
 
-        # 檢查 .gitignore 是否忽略虛擬環境
         gitignore = self.project_path / '.gitignore'
         venv_ignored = False
 
@@ -149,83 +320,6 @@ class PythonValidator:
         if has_venv and not venv_ignored:
             self.result['warnings'].append('虛擬環境目錄未加入 .gitignore')
 
-    def check_code_style(self):
-        """檢查程式碼風格"""
-        issues = []
-
-        for file_path in self.project_path.rglob('*.py'):
-            if self._should_skip(file_path):
-                continue
-            try:
-                content = file_path.read_text(encoding='utf-8')
-                rel_path = str(file_path.relative_to(self.project_path))
-                lines = content.splitlines()
-
-                # 檢查行長度
-                long_lines = [i+1 for i, line in enumerate(lines) if len(line) > 120]
-                if long_lines:
-                    issues.append({
-                        'file': rel_path,
-                        'issue': f'行過長 (> 120 字元): 第 {long_lines[0]} 行等 {len(long_lines)} 處'
-                    })
-
-                # 檢查 import *
-                if 'from ' in content and ' import *' in content:
-                    issues.append({
-                        'file': rel_path,
-                        'issue': '使用 import * (建議明確匯入)'
-                    })
-
-                # 檢查 TODO/FIXME
-                todo_count = len(re.findall(r'#\s*(TODO|FIXME|XXX)', content, re.IGNORECASE))
-                if todo_count > 5:
-                    issues.append({
-                        'file': rel_path,
-                        'issue': f'過多 TODO/FIXME 註解 ({todo_count} 個)'
-                    })
-
-            except Exception:
-                pass
-
-        self.result['checks']['code_style'] = {
-            'count': len(issues),
-            'issues': issues
-        }
-
-        for issue in issues[:5]:
-            self.result['warnings'].append(f"{issue['file']}: {issue['issue']}")
-
-    def check_ai_packages(self):
-        """檢查 AI/ML 套件"""
-        requirements = self.project_path / 'requirements.txt'
-        pyproject = self.project_path / 'pyproject.toml'
-
-        detected_packages = []
-        content = ''
-
-        if requirements.exists():
-            content = requirements.read_text(encoding='utf-8').lower()
-        elif pyproject.exists():
-            content = pyproject.read_text(encoding='utf-8').lower()
-
-        for pkg, name in self.AI_PACKAGES.items():
-            if pkg.lower() in content:
-                detected_packages.append(name)
-
-        self.result['checks']['ai_packages'] = {
-            'detected': detected_packages
-        }
-
-        # 檢查 CUDA 相容性提示
-        if 'torch' in content.lower() or 'tensorflow' in content.lower():
-            cuda_warning = None
-            if 'cu11' in content or 'cu12' in content:
-                cuda_warning = 'CUDA 版本已指定'
-            else:
-                cuda_warning = '未指定 CUDA 版本（可能造成 GPU 不可用）'
-
-            self.result['checks']['ai_packages']['cuda_note'] = cuda_warning
-
     def _should_skip(self, file_path):
         """檢查是否應該跳過該檔案"""
         file_str = str(file_path)
@@ -240,7 +334,6 @@ class PythonValidator:
         content = gitignore.read_text(encoding='utf-8')
         rel_path = str(file_path.relative_to(self.project_path))
 
-        # 檢查副檔名是否被忽略
         ext = file_path.suffix
         if f'*{ext}' in content:
             return True
@@ -253,3 +346,41 @@ class PythonValidator:
                 return True
 
         return False
+
+
+def run_ruff_check(project_path) -> dict:
+    """獨立函數：執行 Ruff 檢查（供 Hook 使用）"""
+    try:
+        # Lint 檢查
+        lint_result = subprocess.run(
+            ['ruff', 'check', str(project_path)],
+            capture_output=True,
+            text=True,
+            timeout=60
+        )
+
+        # Format 檢查
+        format_result = subprocess.run(
+            ['ruff', 'format', '--check', str(project_path)],
+            capture_output=True,
+            text=True,
+            timeout=60
+        )
+
+        lint_passed = lint_result.returncode == 0
+        format_passed = format_result.returncode == 0
+
+        return {
+            'passed': lint_passed and format_passed,
+            'lint_passed': lint_passed,
+            'format_passed': format_passed,
+            'lint_output': lint_result.stdout[:500] if lint_result.stdout else '',
+            'format_output': format_result.stdout[:500] if format_result.stdout else ''
+        }
+
+    except FileNotFoundError:
+        return {'passed': True, 'skipped': 'Ruff 未安裝'}
+    except subprocess.TimeoutExpired:
+        return {'passed': False, 'error': '執行逾時'}
+    except Exception as e:
+        return {'passed': False, 'error': str(e)}

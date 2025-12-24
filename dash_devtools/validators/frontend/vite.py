@@ -1,23 +1,27 @@
 """
-Vite 專案驗證器
+Vite 專案驗證器 v2.0
+
+支援：
+- Vue 3 + Vite + DaisyUI (新架構)
+- Vite + Shoelace (舊架構，向下相容)
 
 檢查項目：
-1. Shoelace 正確設定
-2. 禁止 Emoji 圖示（應用 sl-icon）
-3. HTML 標籤完整性
-4. 空白按鈕/事件處理器
-5. 表單與表格結構
+1. DaisyUI/Tailwind 設定
+2. Vue SFC 語法檢查
+3. 禁止 Emoji 圖示
+4. HTML 標籤完整性
+5. 空白按鈕/事件處理器
 6. Bundle 大小
 """
 
 import re
 import json
+import subprocess
 from pathlib import Path
 
 
-# 常見 Emoji 圖示（這些應該用 sl-icon 取代）
+# 常見 Emoji 圖示（這些應該用圖示庫取代）
 ICON_EMOJI_PATTERNS = [
-    # 工具與操作
     r'[\U0001F527\U0001F528\U0001F529]',  # wrench/hammer
     r'[\U0001F504\U0001F503]',  # refresh
     r'[\U0001F50D\U0001F50E]',  # search
@@ -26,13 +30,11 @@ ICON_EMOJI_PATTERNS = [
     r'[\u270F]',  # pencil
     r'[\u2795]',  # plus
     r'[\u2796]',  # minus
-    # 狀態指示
     r'[\u2705]',  # check mark
     r'[\u274C]',  # cross mark
     r'[\u26A0]',  # warning
     r'[\U0001F6A8]',  # alert
     r'[\u2139]',  # info
-    # 物件與符號
     r'[\U0001F3E2]',  # building
     r'[\U0001F4CB]',  # clipboard
     r'[\U0001F4C5\U0001F4C6]',  # calendar
@@ -40,19 +42,17 @@ ICON_EMOJI_PATTERNS = [
     r'[\U0001F512\U0001F513]',  # lock
     r'[\U0001F510]',  # key lock
     r'[\u231B\u23F3]',  # hourglass
-    # 數字圓圈
     r'[1-9]\uFE0F?\u20E3',  # 1️⃣ 2️⃣ etc
 ]
 
 
 class ViteValidator:
-    """Vite 專案驗證器"""
+    """Vite 專案驗證器 (支援 Vue 3 + DaisyUI)"""
 
     name = 'vite'
 
-    # 忽略目錄
     IGNORE_DIRS = [
-        'node_modules', '.git', 'dist', 'build', '.cache'
+        'node_modules', '.git', 'dist', 'build', '.cache', '.vercel'
     ]
 
     def __init__(self, project_path):
@@ -66,6 +66,42 @@ class ViteValidator:
             'warnings': [],
             'checks': {}
         }
+        # 偵測專案類型
+        self.ui_framework = self._detect_ui_framework()
+        self.is_vue = self._detect_vue()
+
+    def _detect_ui_framework(self) -> str | None:
+        """偵測 UI 框架"""
+        pkg_path = self.project_path / 'package.json'
+        if not pkg_path.exists():
+            return None
+
+        try:
+            pkg = json.loads(pkg_path.read_text(encoding='utf-8'))
+            deps = {**pkg.get('dependencies', {}), **pkg.get('devDependencies', {})}
+
+            if 'daisyui' in deps:
+                return 'daisyui'
+            if '@shoelace-style/shoelace' in deps:
+                return 'shoelace'
+            if 'tailwindcss' in deps:
+                return 'tailwind'
+        except Exception:
+            pass
+        return None
+
+    def _detect_vue(self) -> bool:
+        """偵測是否為 Vue 專案"""
+        pkg_path = self.project_path / 'package.json'
+        if not pkg_path.exists():
+            return False
+
+        try:
+            pkg = json.loads(pkg_path.read_text(encoding='utf-8'))
+            deps = {**pkg.get('dependencies', {}), **pkg.get('devDependencies', {})}
+            return 'vue' in deps
+        except Exception:
+            return False
 
     def run(self):
         """執行所有驗證"""
@@ -74,80 +110,248 @@ class ViteValidator:
             self.result['errors'].append(f'專案路徑不存在: {self.project_path}')
             return self.result
 
-        self.check_shoelace_setup()
+        # 根據 UI 框架選擇驗證
+        if self.ui_framework == 'daisyui':
+            self.check_daisyui_setup()
+        elif self.ui_framework == 'shoelace':
+            self.check_shoelace_setup()
+
+        # Vue SFC 檢查
+        if self.is_vue:
+            self.check_vue_sfc()
+
+        # 通用檢查
         self.check_emoji_icons()
         self.check_incomplete_html_tags()
         self.check_empty_buttons()
-        self.check_empty_event_handlers()
-        self.check_table_structure()
-        self.check_form_structure()
-        self.check_ux_patterns()
         self.check_bundle_size()
 
         return self.result
 
+    def check_daisyui_setup(self):
+        """檢查 DaisyUI + Tailwind CSS v4 設定"""
+        pkg_path = self.project_path / 'package.json'
+        has_daisyui = False
+        has_tailwind = False
+        daisyui_version = None
+        tailwind_version = None
+
+        if pkg_path.exists():
+            try:
+                pkg = json.loads(pkg_path.read_text(encoding='utf-8'))
+                deps = {**pkg.get('dependencies', {}), **pkg.get('devDependencies', {})}
+
+                has_daisyui = 'daisyui' in deps
+                has_tailwind = 'tailwindcss' in deps or '@tailwindcss/vite' in deps
+
+                daisyui_version = deps.get('daisyui')
+                tailwind_version = deps.get('tailwindcss') or deps.get('@tailwindcss/vite')
+            except Exception:
+                pass
+
+        # 檢查 CSS 配置 (Tailwind v4 使用 @import/@plugin)
+        css_config_valid = False
+        css_file = self.src_path / 'style.css'
+        if not css_file.exists():
+            css_file = self.src_path / 'index.css'
+        if not css_file.exists():
+            css_file = self.src_path / 'main.css'
+
+        if css_file.exists():
+            try:
+                content = css_file.read_text(encoding='utf-8')
+                # Tailwind v4 語法
+                if '@import "tailwindcss"' in content or '@tailwind' in content:
+                    css_config_valid = True
+                if '@plugin "daisyui"' in content:
+                    css_config_valid = True
+            except Exception:
+                pass
+
+        # 檢查 vite.config.ts 是否有 tailwindcss plugin
+        vite_config = self.project_path / 'vite.config.ts'
+        vite_config_valid = False
+        if vite_config.exists():
+            try:
+                content = vite_config.read_text(encoding='utf-8')
+                if 'tailwindcss' in content or '@tailwindcss/vite' in content:
+                    vite_config_valid = True
+            except Exception:
+                pass
+
+        self.result['checks']['daisyui_setup'] = {
+            'has_daisyui': has_daisyui,
+            'has_tailwind': has_tailwind,
+            'daisyui_version': daisyui_version,
+            'tailwind_version': tailwind_version,
+            'css_config_valid': css_config_valid,
+            'vite_config_valid': vite_config_valid
+        }
+
+        if has_daisyui and not css_config_valid:
+            self.result['warnings'].append('DaisyUI 已安裝但 CSS 配置可能不完整')
+
+        if has_tailwind and not vite_config_valid:
+            self.result['warnings'].append('Tailwind 已安裝但 vite.config 可能缺少 plugin')
+
     def check_shoelace_setup(self):
-        """檢查 Shoelace 設定"""
+        """檢查 Shoelace 設定 (向下相容)"""
         index_html = self.project_path / 'index.html'
         has_shoelace_css = False
         has_shoelace_js = False
-        shoelace_version = None
 
         if index_html.exists():
             try:
                 content = index_html.read_text(encoding='utf-8')
                 has_shoelace_css = 'shoelace' in content.lower() and '.css' in content
                 has_shoelace_js = 'shoelace' in content.lower() and '.js' in content
-
-                # 嘗試取得版本
-                version_match = re.search(r'shoelace@([\d.]+)', content)
-                if version_match:
-                    shoelace_version = version_match.group(1)
-            except Exception:
-                pass
-
-        # 檢查 package.json
-        pkg_path = self.project_path / 'package.json'
-        has_shoelace_dep = False
-
-        if pkg_path.exists():
-            try:
-                content = pkg_path.read_text(encoding='utf-8')
-                has_shoelace_dep = '@shoelace-style/shoelace' in content
             except Exception:
                 pass
 
         self.result['checks']['shoelace_setup'] = {
             'has_css': has_shoelace_css,
-            'has_js': has_shoelace_js,
-            'has_dependency': has_shoelace_dep,
-            'version': shoelace_version
+            'has_js': has_shoelace_js
         }
 
-        # Shoelace 是預期的，缺少才是問題
-        if not has_shoelace_css and not has_shoelace_dep:
-            self.result['warnings'].append('未偵測到 Shoelace 設定')
+    def check_vue_sfc(self):
+        """檢查 Vue SFC 語法"""
+        if not self.src_path.exists():
+            return
+
+        vue_files = list(self.src_path.rglob('*.vue'))
+        issues = []
+
+        for file_path in vue_files:
+            if self._should_skip(file_path):
+                continue
+
+            try:
+                content = file_path.read_text(encoding='utf-8')
+                rel_path = str(file_path.relative_to(self.project_path))
+                file_issues = []
+
+                # 1. 檢查基本結構
+                has_template = '<template>' in content or '<template ' in content
+                has_script = '<script' in content
+
+                if not has_template:
+                    file_issues.append('缺少 <template> 區塊')
+
+                # 2. 檢查 script setup 語法
+                if '<script setup' in content:
+                    # 檢查是否有未使用的 import
+                    imports = re.findall(r'import\s+{([^}]+)}\s+from', content)
+                    for import_group in imports:
+                        items = [i.strip() for i in import_group.split(',')]
+                        for item in items:
+                            # 簡單檢查：import 的項目是否在 template 中使用
+                            clean_item = item.split(' as ')[-1].strip()
+                            template_match = re.search(r'<template[^>]*>([\s\S]*)</template>', content)
+                            if template_match:
+                                template_content = template_match.group(1)
+                                # 檢查元件使用 (PascalCase 或 kebab-case)
+                                kebab_case = re.sub(r'(?<!^)(?=[A-Z])', '-', clean_item).lower()
+                                if clean_item not in template_content and kebab_case not in template_content:
+                                    # 可能是未使用的 import，但不確定，只記錄為 info
+                                    pass
+
+                # 3. 檢查 template 中的常見錯誤
+                template_match = re.search(r'<template[^>]*>([\s\S]*)</template>', content)
+                if template_match:
+                    template = template_match.group(1)
+
+                    # 檢查 v-for 是否有 :key
+                    v_for_without_key = re.findall(r'v-for="[^"]*"(?![^>]*:key)', template)
+                    if v_for_without_key:
+                        file_issues.append(f'v-for 缺少 :key ({len(v_for_without_key)} 處)')
+
+                    # 檢查空的 @click
+                    empty_click = re.findall(r'@click="\s*"', template)
+                    if empty_click:
+                        file_issues.append(f'空的 @click 事件處理器 ({len(empty_click)} 處)')
+
+                if file_issues:
+                    issues.append({
+                        'file': rel_path,
+                        'issues': file_issues
+                    })
+
+            except Exception:
+                pass
+
+        self.result['checks']['vue_sfc'] = {
+            'total_files': len(vue_files),
+            'files_with_issues': len(issues),
+            'issues': issues
+        }
+
+        # 只有嚴重問題才報錯
+        for issue in issues:
+            for problem in issue['issues']:
+                if '缺少' in problem:
+                    self.result['errors'].append(f"Vue SFC: {issue['file']} - {problem}")
+                else:
+                    self.result['warnings'].append(f"Vue SFC: {issue['file']} - {problem}")
+
+    def check_vue_tsc(self):
+        """執行 vue-tsc 類型檢查"""
+        pkg_path = self.project_path / 'package.json'
+        has_vue_tsc = False
+
+        if pkg_path.exists():
+            try:
+                content = pkg_path.read_text(encoding='utf-8')
+                has_vue_tsc = 'vue-tsc' in content
+            except Exception:
+                pass
+
+        if not has_vue_tsc:
+            self.result['checks']['vue_tsc'] = {'skipped': '未安裝 vue-tsc'}
+            return
+
+        try:
+            result = subprocess.run(
+                ['npx', 'vue-tsc', '--noEmit'],
+                cwd=self.project_path,
+                capture_output=True,
+                text=True,
+                timeout=60
+            )
+
+            self.result['checks']['vue_tsc'] = {
+                'passed': result.returncode == 0,
+                'output': result.stdout[:500] if result.stdout else result.stderr[:500]
+            }
+
+            if result.returncode != 0:
+                self.result['warnings'].append('vue-tsc 類型檢查有警告或錯誤')
+
+        except subprocess.TimeoutExpired:
+            self.result['checks']['vue_tsc'] = {'error': '執行逾時'}
+        except Exception as e:
+            self.result['checks']['vue_tsc'] = {'error': str(e)}
 
     def check_emoji_icons(self):
-        """檢查 Emoji 圖示（應用 sl-icon 取代）"""
+        """檢查 Emoji 圖示"""
         if not self.src_path.exists():
             return
 
         total_count = 0
         file_issues = {}
-
-        # 合併所有 emoji 模式
         combined_pattern = '|'.join(ICON_EMOJI_PATTERNS)
 
-        for ext in ['*.js', '*.html']:
+        # 根據專案類型決定要檢查的副檔名
+        extensions = ['*.js', '*.ts', '*.html']
+        if self.is_vue:
+            extensions.append('*.vue')
+
+        for ext in extensions:
             for file_path in self.src_path.rglob(ext):
                 if self._should_skip(file_path):
                     continue
                 try:
                     content = file_path.read_text(encoding='utf-8')
-                    # 只檢查 HTML 樣板字串中的 emoji
                     template_content = self._extract_template_strings(content)
-
                     matches = re.findall(combined_pattern, template_content)
                     if matches:
                         rel_path = str(file_path.relative_to(self.project_path))
@@ -162,43 +366,52 @@ class ViteValidator:
         }
 
         if total_count > 0:
+            icon_lib = 'lucide-vue-next' if self.is_vue else 'sl-icon'
             self.result['warnings'].append(
-                f'Emoji 圖示: {total_count} 個（應改用 sl-icon）'
+                f'Emoji 圖示: {total_count} 個（應改用 {icon_lib}）'
             )
 
     def _extract_template_strings(self, content):
-        """提取 HTML 樣板字串內容"""
+        """提取模板字串內容"""
+        # JavaScript 模板字串
         template_matches = re.findall(r'`[^`]*`', content, re.DOTALL)
-        return '\n'.join(template_matches)
+        # Vue template
+        vue_template = re.findall(r'<template[^>]*>([\s\S]*?)</template>', content)
+        return '\n'.join(template_matches + vue_template)
 
     def check_incomplete_html_tags(self):
         """檢查不完整的 HTML 標籤"""
         if not self.src_path.exists():
             return
 
-        tags_to_check = ['select', 'textarea', 'table', 'ul', 'ol']
+        tags_to_check = ['select', 'textarea', 'table', 'ul', 'ol', 'div']
         issues = []
 
-        for file_path in self.src_path.rglob('*.js'):
-            if self._should_skip(file_path):
-                continue
-            try:
-                content = file_path.read_text(encoding='utf-8')
-                rel_path = str(file_path.relative_to(self.project_path))
+        extensions = ['*.js', '*.ts']
+        if self.is_vue:
+            extensions.append('*.vue')
 
-                for tag in tags_to_check:
-                    open_count = len(re.findall(rf'<{tag}[^>]*>', content))
-                    close_count = len(re.findall(rf'</{tag}>', content))
+        for ext in extensions:
+            for file_path in self.src_path.rglob(ext):
+                if self._should_skip(file_path):
+                    continue
+                try:
+                    content = file_path.read_text(encoding='utf-8')
+                    rel_path = str(file_path.relative_to(self.project_path))
 
-                    if open_count > close_count:
-                        diff = open_count - close_count
-                        issues.append({
-                            'file': rel_path,
-                            'tag': tag,
-                            'missing': diff
-                        })
-            except Exception:
-                pass
+                    for tag in tags_to_check:
+                        open_count = len(re.findall(rf'<{tag}[^>]*>', content))
+                        close_count = len(re.findall(rf'</{tag}>', content))
+
+                        if open_count > close_count:
+                            diff = open_count - close_count
+                            issues.append({
+                                'file': rel_path,
+                                'tag': tag,
+                                'missing': diff
+                            })
+                except Exception:
+                    pass
 
         self.result['checks']['incomplete_html'] = {
             'count': len(issues),
@@ -217,31 +430,35 @@ class ViteValidator:
         if not self.src_path.exists():
             return
 
-        # 原生 button 和 sl-button 都檢查
         patterns = [
             r'<button[^>]*>\s*\n?\s*</button>',
             r'<sl-button[^>]*>\s*\n?\s*</sl-button>'
         ]
         issues = []
 
-        for file_path in self.src_path.rglob('*.js'):
-            if self._should_skip(file_path):
-                continue
-            try:
-                content = file_path.read_text(encoding='utf-8')
-                total_matches = 0
-                for pattern in patterns:
-                    matches = re.findall(pattern, content)
-                    total_matches += len(matches)
+        extensions = ['*.js', '*.ts']
+        if self.is_vue:
+            extensions.append('*.vue')
 
-                if total_matches > 0:
-                    rel_path = str(file_path.relative_to(self.project_path))
-                    issues.append({
-                        'file': rel_path,
-                        'count': total_matches
-                    })
-            except Exception:
-                pass
+        for ext in extensions:
+            for file_path in self.src_path.rglob(ext):
+                if self._should_skip(file_path):
+                    continue
+                try:
+                    content = file_path.read_text(encoding='utf-8')
+                    total_matches = 0
+                    for pattern in patterns:
+                        matches = re.findall(pattern, content)
+                        total_matches += len(matches)
+
+                    if total_matches > 0:
+                        rel_path = str(file_path.relative_to(self.project_path))
+                        issues.append({
+                            'file': rel_path,
+                            'count': total_matches
+                        })
+                except Exception:
+                    pass
 
         self.result['checks']['empty_buttons'] = {
             'count': sum(i['count'] for i in issues),
@@ -252,194 +469,6 @@ class ViteValidator:
             total = sum(i['count'] for i in issues)
             self.result['warnings'].append(f'空白按鈕: {total} 個')
 
-    def check_empty_event_handlers(self):
-        """檢查空白事件處理器"""
-        if not self.src_path.exists():
-            return
-
-        pattern = r"addEventListener\s*\(\s*['\"]['\"]"
-        issues = []
-
-        for file_path in self.src_path.rglob('*.js'):
-            if self._should_skip(file_path):
-                continue
-            try:
-                content = file_path.read_text(encoding='utf-8')
-                matches = re.findall(pattern, content)
-                if matches:
-                    rel_path = str(file_path.relative_to(self.project_path))
-                    issues.append({
-                        'file': rel_path,
-                        'count': len(matches)
-                    })
-            except Exception:
-                pass
-
-        self.result['checks']['empty_event_handlers'] = {
-            'count': sum(i['count'] for i in issues) if issues else 0,
-            'files': issues
-        }
-
-        if issues:
-            self.result['passed'] = False
-            for issue in issues:
-                self.result['errors'].append(
-                    f"空白事件處理器: {issue['file']} 有 {issue['count']} 個"
-                )
-
-    def check_table_structure(self):
-        """檢查表格結構完整性"""
-        if not self.src_path.exists():
-            return
-
-        issues = []
-
-        for file_path in self.src_path.rglob('*.js'):
-            if self._should_skip(file_path):
-                continue
-            try:
-                content = file_path.read_text(encoding='utf-8')
-                rel_path = str(file_path.relative_to(self.project_path))
-
-                # 檢查 table 是否有 thead 和 tbody
-                table_count = len(re.findall(r'<table[^>]*>', content))
-                thead_count = len(re.findall(r'<thead[^>]*>', content))
-                tbody_count = len(re.findall(r'<tbody[^>]*>', content))
-
-                if table_count > 0:
-                    if thead_count < table_count:
-                        issues.append({
-                            'file': rel_path,
-                            'issue': f'表格缺少 <thead>'
-                        })
-                    if tbody_count < table_count:
-                        issues.append({
-                            'file': rel_path,
-                            'issue': f'表格缺少 <tbody>'
-                        })
-
-                # 檢查 tr 閉合
-                tr_count = len(re.findall(r'<tr[^>]*>', content))
-                tr_close_count = len(re.findall(r'</tr>', content))
-                if tr_count > tr_close_count:
-                    issues.append({
-                        'file': rel_path,
-                        'issue': f'表格行缺少 </tr> ({tr_count - tr_close_count} 個)'
-                    })
-
-            except Exception:
-                pass
-
-        self.result['checks']['table_structure'] = {
-            'count': len(issues),
-            'issues': issues
-        }
-
-        if issues:
-            for issue in issues[:5]:
-                self.result['warnings'].append(f"{issue['file']}: {issue['issue']}")
-
-    def check_form_structure(self):
-        """檢查表單結構"""
-        if not self.src_path.exists():
-            return
-
-        issues = []
-
-        for file_path in self.src_path.rglob('*.js'):
-            if self._should_skip(file_path):
-                continue
-            try:
-                content = file_path.read_text(encoding='utf-8')
-                rel_path = str(file_path.relative_to(self.project_path))
-
-                # 檢查 select/sl-select 是否有 option
-                select_matches = list(re.finditer(r'<(?:sl-)?select[^>]*>', content))
-                for match in select_matches:
-                    start = match.end()
-                    # 找對應閉合標籤
-                    if 'sl-select' in match.group():
-                        end = content.find('</sl-select>', start)
-                    else:
-                        end = content.find('</select>', start)
-
-                    if end != -1:
-                        select_content = content[start:end]
-                        if '<option' not in select_content and '<sl-option' not in select_content:
-                            issues.append({
-                                'file': rel_path,
-                                'issue': '下拉選單缺少選項'
-                            })
-
-            except Exception:
-                pass
-
-        self.result['checks']['form_structure'] = {
-            'count': len(issues),
-            'issues': issues
-        }
-
-        if issues:
-            for issue in issues[:5]:
-                self.result['warnings'].append(f"{issue['file']}: {issue['issue']}")
-
-    def check_ux_patterns(self):
-        """檢查 UI/UX 模式"""
-        if not self.src_path.exists():
-            return
-
-        issues = []
-
-        for file_path in self.src_path.rglob('*.js'):
-            if self._should_skip(file_path):
-                continue
-            try:
-                content = file_path.read_text(encoding='utf-8')
-                rel_path = str(file_path.relative_to(self.project_path))
-
-                # 1. 圖示按鈕缺少 title
-                # 找 sl-button 只有 sl-icon 沒有文字
-                icon_only_buttons = re.findall(
-                    r'<sl-button[^>]*>[\s\n]*<sl-icon[^>]*>[\s\n]*</sl-icon>[\s\n]*</sl-button>',
-                    content
-                )
-                buttons_without_title = [b for b in icon_only_buttons if 'title=' not in b]
-                if buttons_without_title:
-                    issues.append({
-                        'file': rel_path,
-                        'issue': f'圖示按鈕缺少 title 屬性 ({len(buttons_without_title)} 個)',
-                        'severity': 'a11y'
-                    })
-
-                # 2. 表格內操作按鈕數量過多（建議用 sl-dropdown）
-                if '<td>' in content or '<td ' in content:
-                    # 找 td 內有多個按鈕
-                    td_matches = re.findall(r'<td[^>]*>([\s\S]*?)</td>', content)
-                    for td_content in td_matches:
-                        button_count = len(re.findall(r'<(?:sl-)?button', td_content))
-                        if button_count > 3:
-                            issues.append({
-                                'file': rel_path,
-                                'issue': f'表格儲存格按鈕過多 ({button_count} 個)，建議用下拉選單',
-                                'severity': 'ux'
-                            })
-                            break
-
-            except Exception:
-                pass
-
-        self.result['checks']['ux_patterns'] = {
-            'count': len(issues),
-            'issues': issues
-        }
-
-        if issues:
-            for issue in issues[:5]:
-                severity = issue.get('severity', 'ux')
-                prefix_map = {'ux': '[UX]', 'a11y': '[A11Y]', 'ui': '[UI]'}
-                prefix = prefix_map.get(severity, '[UX]')
-                self.result['warnings'].append(f"{prefix} {issue['file']}: {issue['issue']}")
-
     def check_bundle_size(self):
         """檢查 Bundle 大小"""
         dist_path = self.project_path / 'dist'
@@ -447,14 +476,8 @@ class ViteValidator:
             self.result['checks']['bundle_size'] = {'skipped': '無 dist 目錄'}
             return
 
-        css_size = 0
-        js_size = 0
-
-        for f in dist_path.rglob('*.css'):
-            css_size += f.stat().st_size
-
-        for f in dist_path.rglob('*.js'):
-            js_size += f.stat().st_size
+        css_size = sum(f.stat().st_size for f in dist_path.rglob('*.css'))
+        js_size = sum(f.stat().st_size for f in dist_path.rglob('*.js'))
 
         css_kb = css_size / 1024
         js_kb = js_size / 1024
