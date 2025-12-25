@@ -648,8 +648,9 @@ def test(project, test_all, coverage, verbose):
 @click.option('--check', type=click.Choice(['errors', 'load', 'all']), default='errors',
               help='檢查類型 (errors=JS錯誤, load=頁面載入, all=全部)')
 @click.option('--timeout', '-t', type=int, default=30000, help='超時時間 (毫秒)')
+@click.option('--screenshot', '-s', is_flag=True, help='失敗時自動截圖')
 @click.option('--json', 'output_json', is_flag=True, help='輸出 JSON 格式')
-def e2e(url, check, timeout, output_json):
+def e2e(url, check, timeout, screenshot, output_json):
     """E2E 煙霧測試
 
     使用 Puppeteer 載入頁面並檢查：
@@ -664,6 +665,7 @@ def e2e(url, check, timeout, output_json):
       dash e2e https://example.com
       dash e2e https://example.com --check load
       dash e2e https://example.com --timeout 60000
+      dash e2e https://example.com --screenshot
       dash e2e https://example.com --json
     """
     from .e2e import run_e2e_test, check_puppeteer_installed
@@ -676,26 +678,35 @@ def e2e(url, check, timeout, output_json):
         raise SystemExit(1)
 
     console.print(f"[cyan]E2E 測試: {url}[/cyan]")
-    console.print(f"[dim]  檢查類型: {check} | 超時: {timeout}ms[/dim]")
+    options = [f"檢查類型: {check}", f"超時: {timeout}ms"]
+    if screenshot:
+        options.append("失敗截圖: ON")
+    console.print(f"[dim]  {' | '.join(options)}[/dim]")
 
-    result = run_e2e_test(url, timeout=timeout, check_type=check)
+    result = run_e2e_test(url, timeout=timeout, check_type=check, screenshot_on_fail=screenshot)
 
     if output_json:
         console.print(json_module.dumps(result, indent=2, ensure_ascii=False))
     else:
         if result['success']:
-            console.print(f"[green]✓ 測試通過[/green]")
+            console.print(f"[green]v 測試通過[/green]")
             console.print(f"  載入時間: {result['loadTime']}ms")
             console.print(f"  HTTP 狀態: {result['status']}")
             if result.get('warnings'):
                 console.print(f"  [yellow]警告: {len(result['warnings'])} 個[/yellow]")
         else:
-            console.print(f"[red]✗ 測試失敗[/red]")
+            console.print(f"[red]x 測試失敗[/red]")
             console.print(f"  HTTP 狀態: {result['status']}")
             if result.get('errors'):
                 console.print(f"\n[red]錯誤 ({len(result['errors'])}):[/red]")
                 for err in result['errors'][:5]:
-                    console.print(f"  • {err[:100]}...")
+                    console.print(f"  - {err[:100]}...")
+
+            # 顯示截圖路徑
+            if result.get('screenshot'):
+                console.print(f"\n[yellow]截圖已儲存: {result['screenshot']}[/yellow]")
+                console.print("[dim]  使用 Read 工具查看截圖進行除錯[/dim]")
+
             raise SystemExit(1)
 
 
