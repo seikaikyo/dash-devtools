@@ -4,16 +4,10 @@ DashAI DevTools - AI Engine
 """
 
 import os
+from pathlib import Path
 from typing import Optional
 from dataclasses import dataclass
 from enum import Enum
-
-# 載入 .env 檔案 (如果存在)
-try:
-    from dotenv import load_dotenv
-    load_dotenv()
-except ImportError:
-    pass  # dotenv 是可選的
 
 # 檢查 Google GenAI SDK (新版)
 GENAI_AVAILABLE = False
@@ -25,6 +19,74 @@ try:
     GENAI_AVAILABLE = True
 except ImportError as e:
     _GENAI_IMPORT_ERROR = str(e)
+
+
+def _load_dotenv_multi_path() -> list[str]:
+    """
+    多路徑載入 .env 檔案
+
+    搜尋順序：
+    1. 當前工作目錄 .env
+    2. 使用者家目錄 ~/.env
+    3. dash-devtools 專案目錄 .env
+
+    Returns:
+        成功載入的路徑列表
+    """
+    loaded_paths = []
+
+    try:
+        from dotenv import load_dotenv
+    except ImportError:
+        return loaded_paths  # dotenv 未安裝
+
+    # 搜尋路徑列表
+    search_paths = [
+        Path.cwd() / '.env',                    # 當前目錄
+        Path.home() / '.env',                   # 家目錄
+        Path(__file__).parent.parent / '.env',  # dash-devtools 根目錄
+    ]
+
+    for env_path in search_paths:
+        if env_path.exists():
+            load_dotenv(env_path, override=False)  # 不覆蓋已存在的值
+            loaded_paths.append(str(env_path))
+
+    return loaded_paths
+
+
+def _mask_api_key(key: str) -> str:
+    """隱藏 API Key 中間字元"""
+    if len(key) <= 8:
+        return key[:2] + '*' * (len(key) - 2)
+    return key[:4] + '*' * (len(key) - 8) + key[-4:]
+
+
+def _debug_env_info() -> str:
+    """產生除錯資訊"""
+    lines = []
+
+    # 檢查 GEMINI_API_KEY 是否存在
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if api_key:
+        lines.append(f"  GEMINI_API_KEY: {_mask_api_key(api_key)} (已設定)")
+    else:
+        lines.append("  GEMINI_API_KEY: (未設定)")
+
+    # 列出所有 GEMINI 或 GOOGLE 相關的環境變數
+    related_keys = [k for k in os.environ.keys()
+                    if 'GEMINI' in k.upper() or 'GOOGLE' in k.upper()]
+    if related_keys:
+        lines.append("  相關環境變數:")
+        for k in sorted(related_keys):
+            val = os.environ.get(k, "")
+            if 'KEY' in k.upper() or 'SECRET' in k.upper() or 'TOKEN' in k.upper():
+                val = _mask_api_key(val) if val else "(空)"
+            else:
+                val = val[:50] + "..." if len(val) > 50 else val
+            lines.append(f"    {k}: {val}")
+
+    return "\n".join(lines)
 
 
 class AIModel(Enum):
@@ -68,6 +130,9 @@ class AIEngine:
             model: 使用的模型 (預設 gemini-2.5-flash)
             api_key: API Key (預設從環境變數 GEMINI_API_KEY 讀取)
         """
+        # 在 __init__ 最前面載入 .env (多路徑搜尋)
+        loaded_paths = _load_dotenv_multi_path()
+
         if not GENAI_AVAILABLE:
             raise ImportError(
                 f"Google GenAI SDK 未安裝或載入失敗。\n"
@@ -77,9 +142,20 @@ class AIEngine:
 
         self.api_key = api_key or os.environ.get("GEMINI_API_KEY")
         if not self.api_key:
+            # 除錯資訊
+            debug_info = _debug_env_info()
+            loaded_info = ""
+            if loaded_paths:
+                loaded_info = f"\n已搜尋的 .env 檔案:\n  " + "\n  ".join(loaded_paths)
+            else:
+                loaded_info = "\n未找到任何 .env 檔案"
+
             raise ValueError(
-                "未設定 GEMINI_API_KEY。\n"
-                "請設定環境變數: export GEMINI_API_KEY='your-api-key'"
+                f"未設定 GEMINI_API_KEY。\n"
+                f"請設定環境變數: export GEMINI_API_KEY='your-api-key'\n"
+                f"或在 .env 檔案中設定: GEMINI_API_KEY=your-api-key\n"
+                f"\n診斷資訊:\n{debug_info}"
+                f"{loaded_info}"
             )
 
         self.model_name = model.value
