@@ -692,9 +692,9 @@ def _handle_ai_error(e: Exception) -> None:
     """處理 AI 相關錯誤，提供精確的修復建議"""
     error_msg = str(e).lower()
 
-    if 'google.generativeai' in error_msg or 'google-generativeai' in error_msg:
-        console.print("[red]缺少 Google Generative AI SDK[/red]")
-        console.print("[yellow]請執行: pip install google-generativeai[/yellow]")
+    if 'google.genai' in error_msg or 'google-genai' in error_msg:
+        console.print("[red]缺少 Google GenAI SDK[/red]")
+        console.print("[yellow]請執行: pip install google-genai[/yellow]")
     elif 'dotenv' in error_msg:
         console.print("[red]缺少 python-dotenv[/red]")
         console.print("[yellow]請執行: pip install python-dotenv[/yellow]")
@@ -703,7 +703,7 @@ def _handle_ai_error(e: Exception) -> None:
         console.print("[yellow]請執行: export GEMINI_API_KEY='your-api-key'[/yellow]")
     elif isinstance(e, ImportError):
         console.print(f"[red]模組載入失敗: {e}[/red]")
-        console.print("[yellow]請執行: pip install google-generativeai python-dotenv[/yellow]")
+        console.print("[yellow]請執行: pip install google-genai python-dotenv[/yellow]")
     elif isinstance(e, ValueError):
         console.print(f"[red]設定錯誤: {e}[/red]")
     else:
@@ -712,9 +712,9 @@ def _handle_ai_error(e: Exception) -> None:
 
 @main.group()
 def ai():
-    """AI 程式碼助手 (Gemini)
+    """AI 程式碼助手 (Gemini 2.5)
 
-    使用 Google Generative AI SDK。
+    使用 Google GenAI SDK (新版)。
     需設定環境變數 GEMINI_API_KEY。
 
     子指令：
@@ -946,7 +946,7 @@ def doctor():
     # 可選依賴
     console.print("[yellow]可選依賴套件[/yellow]")
     optional_deps = [
-        ('google-generativeai', 'AI 功能'),
+        ('google-genai', 'AI 功能'),
         ('opencv-python', 'Vision 功能'),
         ('pillow', 'Vision 功能'),
     ]
