@@ -95,7 +95,7 @@ fi
 echo ""
 
 # 步驟 3: 執行測試
-echo "[>] 步驟 3/3: 執行測試..."
+echo "[>] 步驟 3/4: 執行測試..."
 TEST_RESULT=0
 
 if [ "$IS_FRONTEND" = true ]; then
@@ -146,6 +146,33 @@ if [ $TEST_RESULT -ne 0 ]; then
 fi
 echo ""
 
+# 步驟 4: E2E 煙霧測試 (如果已設定)
+if [ -n "$DASH_E2E_URL" ]; then
+    echo "[>] 步驟 4/4: E2E 煙霧測試..."
+    echo "   測試網址: $DASH_E2E_URL"
+
+    dash e2e "$DASH_E2E_URL" --timeout 45000
+    E2E_RESULT=$?
+
+    if [ $E2E_RESULT -ne 0 ]; then
+        if [ "$DASH_STRICT_E2E" = "1" ]; then
+            echo ""
+            echo "[x] E2E 測試失敗，推送已取消"
+            exit 1
+        else
+            echo ""
+            echo "[!] E2E 測試失敗，但繼續推送 (警告模式)"
+            echo "    使用 --strict-e2e 安裝 hook 可強制 E2E 通過"
+        fi
+    fi
+    echo ""
+else
+    echo "[>] 步驟 4/4: E2E 煙霧測試..."
+    echo "   (未設定 E2E 網址，跳過)"
+    echo "   使用 --e2e <URL> 安裝 hook 可啟用 E2E 測試"
+    echo ""
+fi
+
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "[v] 所有檢查通過，繼續推送..."
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -161,12 +188,14 @@ dash scan "$PROJECT_ROOT"
 '''
 
 
-def install_hooks(project_path, strict_test: bool = False):
+def install_hooks(project_path, strict_test: bool = False, e2e_url: str = None, strict_e2e: bool = False):
     """安裝 git hooks 到專案
 
     Args:
         project_path: 專案路徑
         strict_test: 是否啟用嚴格測試模式（測試失敗會阻止推送）
+        e2e_url: E2E 測試網址（設定後每次推送會執行煙霧測試）
+        strict_e2e: 是否啟用嚴格 E2E 模式（E2E 失敗會阻止推送）
     """
     from pathlib import Path
     import stat
@@ -182,13 +211,26 @@ def install_hooks(project_path, strict_test: bool = False):
 
     # Pre-push hook
     pre_push = hooks_dir / 'pre-push'
-    hook_content = PRE_PUSH_HOOK
+    env_vars = []
 
     # 如果啟用嚴格模式，加入環境變數
     if strict_test:
-        hook_content = 'export DASH_STRICT_TEST=1\n' + hook_content
+        env_vars.append('export DASH_STRICT_TEST=1')
+
+    # E2E 設定
+    if e2e_url:
+        env_vars.append(f'export DASH_E2E_URL="{e2e_url}"')
+        if strict_e2e:
+            env_vars.append('export DASH_STRICT_E2E=1')
+
+    hook_content = '\n'.join(env_vars) + '\n' + PRE_PUSH_HOOK if env_vars else PRE_PUSH_HOOK
 
     pre_push.write_text(hook_content, encoding='utf-8')
     pre_push.chmod(pre_push.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
-    return {'success': True, 'strict_test': strict_test}
+    return {
+        'success': True,
+        'strict_test': strict_test,
+        'e2e_url': e2e_url,
+        'strict_e2e': strict_e2e
+    }

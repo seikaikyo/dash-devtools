@@ -255,7 +255,9 @@ def hooks():
 @hooks.command()
 @click.argument('project', type=click.Path(), default='.')
 @click.option('--strict', is_flag=True, help='嚴格模式：測試失敗會阻止推送')
-def install(project, strict):
+@click.option('--e2e', type=str, default=None, help='E2E 測試網址 (每次推送會執行煙霧測試)')
+@click.option('--strict-e2e', is_flag=True, help='嚴格 E2E 模式：E2E 失敗會阻止推送')
+def install(project, strict, e2e, strict_e2e):
     """安裝 Git Hooks 到專案
 
     Pre-push 會執行：
@@ -263,14 +265,17 @@ def install(project, strict):
     2. 掃描機敏資料
     3. 驗證專案規範
     4. 執行測試
+    5. E2E 煙霧測試 (如有設定)
 
     使用範例：
       dash hooks install .
       dash hooks install . --strict
+      dash hooks install . --e2e https://example.com
+      dash hooks install . --e2e https://example.com --strict-e2e
     """
     from .hooks import install_hooks
 
-    result = install_hooks(project, strict_test=strict)
+    result = install_hooks(project, strict_test=strict, e2e_url=e2e, strict_e2e=strict_e2e)
 
     if result['success']:
         console.print("[green]✓ Git Hooks 已安裝[/green]")
@@ -281,9 +286,15 @@ def install(project, strict):
         console.print("    2. 掃描機敏資料")
         console.print("    3. 驗證專案規範")
         console.print("    4. 執行測試")
+        console.print("    5. E2E 煙霧測試")
         if strict:
             console.print()
             console.print("  [yellow]嚴格模式已啟用：測試失敗會阻止推送[/yellow]")
+        if e2e:
+            console.print()
+            console.print(f"  [cyan]E2E 測試：{e2e}[/cyan]")
+            if strict_e2e:
+                console.print("  [yellow]嚴格 E2E 模式已啟用：E2E 失敗會阻止推送[/yellow]")
     else:
         console.print(f"[red]✗ 安裝失敗: {result.get('error')}[/red]")
 
@@ -630,6 +641,62 @@ def test(project, test_all, coverage, verbose):
         run_test_all(DEFAULT_PROJECTS, coverage=coverage)
     else:
         run_test(project, coverage=coverage, verbose=verbose)
+
+
+@main.command()
+@click.argument('url', type=str)
+@click.option('--check', type=click.Choice(['errors', 'load', 'all']), default='errors',
+              help='檢查類型 (errors=JS錯誤, load=頁面載入, all=全部)')
+@click.option('--timeout', '-t', type=int, default=30000, help='超時時間 (毫秒)')
+@click.option('--json', 'output_json', is_flag=True, help='輸出 JSON 格式')
+def e2e(url, check, timeout, output_json):
+    """E2E 煙霧測試
+
+    使用 Puppeteer 載入頁面並檢查：
+    - JS console 錯誤 (Vue/React TypeError 等)
+    - 頁面載入狀態
+    - 載入時間
+
+    需要先安裝 Node.js 和 Puppeteer:
+      npm install -g puppeteer
+
+    使用範例：
+      dash e2e https://example.com
+      dash e2e https://example.com --check load
+      dash e2e https://example.com --timeout 60000
+      dash e2e https://example.com --json
+    """
+    from .e2e import run_e2e_test, check_puppeteer_installed
+    import json as json_module
+
+    # 檢查 Puppeteer 是否安裝
+    if not check_puppeteer_installed():
+        console.print("[red]Puppeteer 未安裝[/red]")
+        console.print("[yellow]請執行: npm install -g puppeteer[/yellow]")
+        raise SystemExit(1)
+
+    console.print(f"[cyan]E2E 測試: {url}[/cyan]")
+    console.print(f"[dim]  檢查類型: {check} | 超時: {timeout}ms[/dim]")
+
+    result = run_e2e_test(url, timeout=timeout, check_type=check)
+
+    if output_json:
+        console.print(json_module.dumps(result, indent=2, ensure_ascii=False))
+    else:
+        if result['success']:
+            console.print(f"[green]✓ 測試通過[/green]")
+            console.print(f"  載入時間: {result['loadTime']}ms")
+            console.print(f"  HTTP 狀態: {result['status']}")
+            if result.get('warnings'):
+                console.print(f"  [yellow]警告: {len(result['warnings'])} 個[/yellow]")
+        else:
+            console.print(f"[red]✗ 測試失敗[/red]")
+            console.print(f"  HTTP 狀態: {result['status']}")
+            if result.get('errors'):
+                console.print(f"\n[red]錯誤 ({len(result['errors'])}):[/red]")
+                for err in result['errors'][:5]:
+                    console.print(f"  • {err[:100]}...")
+            raise SystemExit(1)
 
 
 @main.command()
