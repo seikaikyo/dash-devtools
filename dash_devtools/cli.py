@@ -698,9 +698,9 @@ def _handle_ai_error(e: Exception) -> None:
     elif 'dotenv' in error_msg:
         console.print("[red]缺少 python-dotenv[/red]")
         console.print("[yellow]請執行: pip install python-dotenv[/yellow]")
-    elif 'gemini_api_key' in error_msg or 'api_key' in error_msg:
-        console.print("[red]未設定 GEMINI_API_KEY 環境變數[/red]")
-        console.print("[yellow]請執行: export GEMINI_API_KEY='your-api-key'[/yellow]")
+    elif 'gemini_api_key' in error_msg:
+        # 顯示完整的錯誤訊息（包含診斷資訊）
+        console.print(f"[red]{e}[/red]")
     elif isinstance(e, ImportError):
         console.print(f"[red]模組載入失敗: {e}[/red]")
         console.print("[yellow]請執行: pip install google-genai python-dotenv[/yellow]")
