@@ -700,6 +700,50 @@ def e2e(url, check, timeout, output_json):
 
 
 @main.command()
+@click.argument('url', type=str)
+@click.option('--category', '-c', type=str, default='performance,accessibility,best-practices,seo',
+              help='測試類別 (逗號分隔)')
+@click.option('--timeout', '-t', type=int, default=120000, help='超時時間 (毫秒)')
+@click.option('--json', 'output_json', is_flag=True, help='輸出 JSON 格式')
+@click.option('--verbose', '-v', is_flag=True, help='詳細輸出')
+def perf(url, category, timeout, output_json, verbose):
+    """Lighthouse 效能測試
+
+    分析網站效能並提供改善建議：
+    - Performance (效能分數)
+    - Accessibility (無障礙)
+    - Best Practices (最佳實踐)
+    - SEO (搜尋引擎優化)
+
+    使用範例：
+      dash perf https://example.com
+      dash perf https://example.com -c performance
+      dash perf https://example.com --json
+      dash perf https://example.com -v
+    """
+    from .perf import run_perf_test, print_perf_report, check_lighthouse_installed
+    import json as json_module
+
+    console.print(f"[cyan]Lighthouse 效能測試: {url}[/cyan]")
+    console.print(f"[dim]  類別: {category} | 超時: {timeout}ms[/dim]")
+    console.print()
+
+    with console.status("[bold green]正在分析效能..."):
+        result = run_perf_test(url, categories=category, timeout=timeout)
+
+    if output_json:
+        console.print(json_module.dumps(result, indent=2, ensure_ascii=False))
+    else:
+        print_perf_report(result, verbose=verbose)
+
+    # 效能分數低於 50 則 exit 1
+    if result.get('success') and result.get('scores', {}).get('performance', 0) < 50:
+        raise SystemExit(1)
+    elif not result.get('success'):
+        raise SystemExit(1)
+
+
+@main.command()
 @click.argument('project', type=click.Path(), default='.')
 @click.option('--test/--no-test', 'include_test', default=True, help='是否執行測試')
 @click.option('--screenshot', '-s', is_flag=True, help='擷取 UI 截圖')
