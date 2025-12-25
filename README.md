@@ -1,6 +1,6 @@
-# DashAI DevTools
+# DashAI DevTools v2.0
 
-大許開發工具集 - 統一的開發、驗證、遷移工具
+大許開發工具集 - 統一的開發、驗證、測試、AI 分析工具
 
 ## 安裝
 
@@ -14,12 +14,19 @@ pip install -e .
 | 分類 | 指令 | 用途 |
 |------|------|------|
 | **驗證** | `dash validate` | 驗證專案符合開發規範 |
-| **遷移** | `dash migrate` | UI 框架遷移（已暫停） |
-| **文件** | `dash docs` | 產生文件、CLAUDE.md |
-| **發布** | `dash release` | 版本管理、發布流程 |
-| **視覺** | `dash vision` | AI 視覺分析工具 |
+| **健康** | `dash health` | 專案健康評分 (類似 Lighthouse) |
+| **統計** | `dash stats` | 程式碼統計儀表板 |
+| **測試** | `dash test` | 執行測試 (vitest/jest/pytest) |
+| **E2E** | `dash e2e` | E2E 煙霧測試 (Puppeteer) |
+| **報告** | `dash report` | 產生完整 HTML 報告 |
+| **監控** | `dash watch` | 即時監控模式 |
 | **掃描** | `dash scan` | 掃描機敏資料 |
+| **AI** | `dash ai` | AI 程式碼助手 (Gemini) |
+| **資料庫** | `dash db` | 資料庫遷移管理 (Alembic) |
 | **圖表** | `dash dbdiagram` | 產生資料庫 ERD 連結 |
+| **文件** | `dash docs` | 產生文件、CLAUDE.md |
+| **視覺** | `dash vision` | AI 視覺分析工具 |
+| **診斷** | `dash doctor` | 診斷開發環境 |
 
 ## 快速使用
 
@@ -177,17 +184,180 @@ npm install -D prisma-dbml-generator
 - 禁止 Emoji (程式碼中)
 - 禁止簡體字
 
+## v2.0 新功能
+
+### 專案健康評分
+
+類似 Lighthouse 的評分機制：
+
+```bash
+# 單一專案
+dash health .
+
+# 所有專案
+dash health --all
+
+# JSON 輸出
+dash health . --json
+```
+
+評分項目：
+- 安全性：機敏資料、依賴漏洞
+- 品質：程式碼規範、檔案結構
+- 維護性：技術債務、文件完整度
+- 效能：Bundle 大小、依賴數量
+
+### 程式碼統計
+
+```bash
+# 單一專案
+dash stats .
+
+# 比較所有專案
+dash stats --all
+```
+
+顯示：語言分佈、檔案數量與行數、最大檔案排行、複雜度警告
+
+### 測試執行
+
+```bash
+# 執行測試
+dash test .
+
+# 含覆蓋率報告
+dash test . --coverage
+
+# 測試所有專案
+dash test --all
+```
+
+自動偵測：vitest、jest、karma、pytest
+
+### E2E 煙霧測試
+
+使用 Puppeteer 檢查頁面 JS 錯誤：
+
+```bash
+# 基本測試
+dash e2e https://your-app.vercel.app
+
+# 只檢查頁面載入
+dash e2e https://example.com --check load
+
+# 延長超時
+dash e2e https://example.com --timeout 60000
+
+# JSON 輸出
+dash e2e https://example.com --json
+```
+
+需要先安裝 Puppeteer：`npm install puppeteer`
+
+### 專案報告
+
+產生完整 HTML 報告：
+
+```bash
+# 基本報告
+dash report .
+
+# 含 UI 截圖
+dash report . --screenshot -u http://localhost:3000
+
+# 不執行測試
+dash report . --no-test
+```
+
+### 即時監控
+
+```bash
+# 監控檔案變更
+dash watch .
+
+# 發現問題自動修復
+dash watch . --fix
+```
+
+### AI 程式碼助手
+
+使用 Gemini 2.5 分析程式碼：
+
+```bash
+# 分析程式碼
+dash ai analyze src/main.py
+
+# 安全分析
+dash ai analyze src/api.ts --focus security
+
+# 建議修復
+dash ai fix src/main.py -e "TypeError: Cannot read property"
+
+# 生成測試
+dash ai test src/utils.py
+
+# 解釋程式碼
+dash ai explain src/complex-algo.py
+
+# 審查 commit
+dash ai review .
+```
+
+需設定環境變數：`export GEMINI_API_KEY="your-api-key"`
+
+### 資料庫遷移
+
+Alembic 整合：
+
+```bash
+# 初始化
+dash db init .
+
+# 檢視狀態
+dash db status .
+
+# 產生遷移
+dash db generate . -m "add user table"
+
+# 升級
+dash db upgrade .
+
+# 降級（需確認）
+dash db downgrade . -r -1 --confirm
+```
+
+### 診斷工具
+
+```bash
+dash doctor
+```
+
+顯示：系統資訊、Python 路徑、套件版本、環境變數
+
 ## Git Hooks
 
 安裝 pre-push hook 自動驗證：
 
 ```bash
-dash hooks install /path/to/project
+# 基本安裝
+dash hooks install .
+
+# 嚴格模式：測試失敗會阻止推送
+dash hooks install . --strict
+
+# 啟用 E2E 煙霧測試
+dash hooks install . --e2e https://your-app.vercel.app
+
+# 嚴格 E2E 模式：E2E 失敗會阻止推送
+dash hooks install . --e2e https://your-app.vercel.app --strict-e2e
 ```
 
 Push 前會自動執行：
-1. 掃描機敏資料 (GitGuardian 或本地規則)
-2. 驗證專案規範
+1. 檢查 Emoji
+2. 掃描機敏資料 (GitGuardian 或本地規則)
+3. 驗證專案規範
+4. 執行測試 (vitest/jest/pytest)
+5. E2E 煙霧測試 (如有設定)
 
 ## 模板
 
