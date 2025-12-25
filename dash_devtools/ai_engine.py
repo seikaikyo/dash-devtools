@@ -1,10 +1,10 @@
 """
 DashAI DevTools - AI Engine
-使用 Google Generative AI SDK (Gemini)
+使用 Google GenAI SDK (Gemini) - 新版 API
 """
 
 import os
-from typing import Optional, List, Dict, Any
+from typing import Optional
 from dataclasses import dataclass
 from enum import Enum
 
@@ -15,20 +15,23 @@ try:
 except ImportError:
     pass  # dotenv 是可選的
 
-# 檢查 Google Generative AI SDK
+# 檢查 Google GenAI SDK (新版)
+GENAI_AVAILABLE = False
+_GENAI_IMPORT_ERROR = ""
+
 try:
-    import google.generativeai as genai
+    from google import genai
+    from google.genai import types
     GENAI_AVAILABLE = True
 except ImportError as e:
-    GENAI_AVAILABLE = False
     _GENAI_IMPORT_ERROR = str(e)
 
 
 class AIModel(Enum):
     """可用的 AI 模型"""
-    GEMINI_FLASH = "gemini-1.5-flash"  # 速度優先
-    GEMINI_PRO = "gemini-1.5-pro"       # 品質優先
-    GEMINI_FLASH_8B = "gemini-1.5-flash-8b"  # 輕量版
+    GEMINI_FLASH = "gemini-2.5-flash"      # 最新快速版
+    GEMINI_PRO = "gemini-2.0-flash"        # 穩定版
+    GEMINI_FLASH_LITE = "gemini-2.0-flash-lite"  # 輕量版
 
 
 @dataclass
@@ -62,15 +65,14 @@ class AIEngine:
         初始化 AI 引擎
 
         Args:
-            model: 使用的模型 (預設 gemini-1.5-flash)
+            model: 使用的模型 (預設 gemini-2.5-flash)
             api_key: API Key (預設從環境變數 GEMINI_API_KEY 讀取)
         """
         if not GENAI_AVAILABLE:
-            error_detail = _GENAI_IMPORT_ERROR if '_GENAI_IMPORT_ERROR' in dir() else ''
             raise ImportError(
-                f"Google Generative AI SDK 未安裝或載入失敗。\n"
-                f"錯誤: {error_detail}\n"
-                f"請執行: pip install google-generativeai"
+                f"Google GenAI SDK 未安裝或載入失敗。\n"
+                f"錯誤: {_GENAI_IMPORT_ERROR}\n"
+                f"請執行: pip install google-genai"
             )
 
         self.api_key = api_key or os.environ.get("GEMINI_API_KEY")
@@ -81,8 +83,7 @@ class AIEngine:
             )
 
         self.model_name = model.value
-        genai.configure(api_key=self.api_key)
-        self.model = genai.GenerativeModel(self.model_name)
+        self.client = genai.Client(api_key=self.api_key)
 
     def generate(
         self,
@@ -108,22 +109,30 @@ class AIEngine:
             if system_prompt:
                 full_prompt = f"{system_prompt}\n\n{prompt}"
 
-            generation_config = genai.GenerationConfig(
+            config = types.GenerateContentConfig(
                 temperature=temperature,
                 max_output_tokens=max_tokens
             )
 
-            response = self.model.generate_content(
-                full_prompt,
-                generation_config=generation_config
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=full_prompt,
+                config=config
             )
+
+            # 取得 token 使用量
+            prompt_tokens = 0
+            completion_tokens = 0
+            if hasattr(response, 'usage_metadata') and response.usage_metadata:
+                prompt_tokens = getattr(response.usage_metadata, 'prompt_token_count', 0) or 0
+                completion_tokens = getattr(response.usage_metadata, 'candidates_token_count', 0) or 0
 
             return AIResponse(
                 success=True,
                 content=response.text,
                 model=self.model_name,
-                prompt_tokens=response.usage_metadata.prompt_token_count if hasattr(response, 'usage_metadata') else 0,
-                completion_tokens=response.usage_metadata.candidates_token_count if hasattr(response, 'usage_metadata') else 0
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens
             )
         except Exception as e:
             return AIResponse(
