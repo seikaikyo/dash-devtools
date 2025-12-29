@@ -55,6 +55,7 @@ class TestTypeResult:
     error: str = ""
     details: List[str] = field(default_factory=list)
     test_cases: List[TestCase] = field(default_factory=list)  # 測試案例列表
+    not_configured: bool = False  # 該測試類型未設定 (優雅跳過)
 
 
 @dataclass
@@ -275,8 +276,10 @@ class TestSuiteRunner:
                     result.coverage = float(match.group(1))
 
             else:
-                result.success = False
-                result.error = "未偵測到單元測試框架 (Vitest/Jest/Pytest)"
+                # 無測試框架，優雅跳過 (不視為失敗)
+                result.success = True
+                result.not_configured = True
+                result.error = "未設定單元測試框架"
 
         except subprocess.TimeoutExpired:
             result.success = False
@@ -290,13 +293,22 @@ class TestSuiteRunner:
     def run_playwright_tests(self, spec_pattern: str, test_type: str, capture_screenshots: bool = True) -> TestTypeResult:
         """執行 Playwright 測試"""
         result = TestTypeResult(test_type=test_type)
+        setup = self.detect_test_setup()
 
         try:
+            # 檢查是否有 Playwright
+            if not setup['has_playwright']:
+                result.success = True
+                result.not_configured = True
+                result.error = "未安裝 Playwright"
+                return result
+
             # 檢查是否有對應的測試檔案
             spec_files = list(self.project_path.glob(f'e2e/{spec_pattern}'))
             if not spec_files:
                 result.success = True
-                result.error = f"未找到 {spec_pattern} 測試檔案"
+                result.not_configured = True
+                result.error = f"未找到 {spec_pattern}"
                 return result
 
             # 為每個測試類型建立獨立的輸出目錄
@@ -515,17 +527,24 @@ def render_test_suite_result(suite: TestSuiteResult):
         'UAT': '驗收測試 (UAT)'
     }
 
+    configured_count = 0
     for test_type, result in suite.results.items():
-        status = "[green]PASS[/green]" if result.success else "[red]FAIL[/red]"
-        if result.error and not result.passed:
-            status = "[yellow]SKIP[/yellow]"
+        # 判斷狀態
+        if result.not_configured:
+            status = "[dim]N/A[/dim]"
+        elif result.success:
+            status = "[green]PASS[/green]"
+            configured_count += 1
+        else:
+            status = "[red]FAIL[/red]"
+            configured_count += 1
 
         coverage_str = f"{result.coverage:.0f}%" if result.coverage > 0 else "-"
 
         table.add_row(
             type_labels.get(test_type, test_type),
             status,
-            str(result.passed),
+            str(result.passed) if not result.not_configured else "-",
             str(result.failed) if result.failed else "-",
             f"{result.duration:.1f}s" if result.duration else "-",
             coverage_str
@@ -568,7 +587,9 @@ def render_test_suite_result(suite: TestSuiteResult):
 
     # 最終狀態
     console.print()
-    if suite.overall_success:
+    if configured_count == 0:
+        console.print(f"  [yellow][-] 此專案未設定任何測試[/yellow]")
+    elif suite.overall_success:
         console.print(f"  [green][v] 所有測試通過[/green]")
     else:
         console.print(f"  [red][x] 部分測試失敗[/red]")
