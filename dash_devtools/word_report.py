@@ -345,9 +345,13 @@ def generate_word_report(
             name_run = p.add_run(f'{i}. {test_name}')
             name_run.font.size = Pt(11)
 
-            # 時間
+            # 時間 (小於 1 秒顯示毫秒)
             if duration:
-                time_run = p.add_run(f'  ({duration:.2f}s)')
+                if duration < 1:
+                    time_str = f'{duration:.2f}ms'
+                else:
+                    time_str = f'{duration:.2f}s'
+                time_run = p.add_run(f'  ({time_str})')
                 time_run.font.size = Pt(9)
                 time_run.font.color.rgb = RGBColor(128, 128, 128)
 
