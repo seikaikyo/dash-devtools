@@ -618,7 +618,7 @@ def run_and_generate_report(
     """
     from .test_suite import TestSuiteRunner
 
-    project = Path(project_path)
+    project = Path(project_path).resolve()  # 使用 resolve() 取得完整路徑
     project_name = project.name
 
     if not output_path:

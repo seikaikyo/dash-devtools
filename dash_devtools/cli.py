@@ -717,8 +717,9 @@ def e2e(url, check, timeout, screenshot, output_json):
 @click.option('--coverage', '-c', is_flag=True, default=True, help='包含覆蓋率報告')
 @click.option('--report', '-r', type=click.Path(), help='輸出 JSON 報告路徑')
 @click.option('--word', '-w', type=click.Path(), help='輸出 Word 報告路徑')
+@click.option('--md', '-m', type=click.Path(), help='輸出 Markdown 報告路徑')
 @click.option('--no-screenshots', is_flag=True, help='不擷取系統截圖')
-def test_suite(project, types, coverage, report, word, no_screenshots):
+def test_suite(project, types, coverage, report, word, md, no_screenshots):
     """四大類型測試套件
 
     執行完整測試套件，包含：
@@ -727,16 +728,17 @@ def test_suite(project, types, coverage, report, word, no_screenshots):
     - E2E: 端對端測試 (Playwright mes-system.spec.ts)
     - UAT: 使用者驗收測試 (Playwright uat.spec.ts)
 
-    Word 報告包含：
-    - 測試摘要與圖表
-    - 所有測試案例明細
-    - 系統截圖 (可用 --no-screenshots 跳過)
+    報告格式：
+    - --word: Word 文件 (含圖表、截圖)
+    - --md: Markdown 文件 (適合 GitHub)
+    - --report: JSON 原始資料
 
     使用範例：
       dash test-suite .
       dash test-suite . --types UIT,Smoke
       dash test-suite . --report ./test-report.json
       dash test-suite . --word ./test-report.docx
+      dash test-suite . --md ./test-report.md
       dash test-suite . --word report.docx --no-screenshots
     """
     from .test_suite import run_test_suite, run_test_suite_report
@@ -751,6 +753,13 @@ def test_suite(project, types, coverage, report, word, no_screenshots):
             output_path=word,
             test_types=test_types,
             include_screenshots=not no_screenshots
+        )
+    elif md:
+        from .markdown_report import run_and_generate_markdown_report
+        result = run_and_generate_markdown_report(
+            project,
+            output_path=md,
+            test_types=test_types,
         )
     elif report:
         result = run_test_suite_report(project, output_path=report)
