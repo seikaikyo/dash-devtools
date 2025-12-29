@@ -184,8 +184,8 @@ class TestSuiteRunner:
                                 result.test_cases.append(TestCase(
                                     name=f"{file_name} › {test_name}",
                                     status=status,
-                                    duration=duration,
-                                    terminal_output=terminal_summary if not result.test_cases else ""
+                                    duration=duration
+                                    # UIT 不顯示 terminal_output (統計已在報告摘要中)
                                 ))
                 except (json.JSONDecodeError, KeyError):
                     # 備援：從輸出解析測試名稱
@@ -196,8 +196,7 @@ class TestSuiteRunner:
                         # 無法取得個別測試名稱，用檔案名代替
                         result.test_cases.append(TestCase(
                             name=f"{file_name} ({test_count} tests)",
-                            status='passed' if '✓' in match.group(0) else 'failed',
-                            terminal_output=terminal_summary if not result.test_cases else ""
+                            status='passed' if '✓' in match.group(0) else 'failed'
                         ))
 
                 # 解析統計
