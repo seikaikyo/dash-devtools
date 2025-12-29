@@ -180,7 +180,8 @@ class TestSuiteRunner:
                             for assertion in test_file.get('assertionResults', []):
                                 test_name = ' › '.join(assertion.get('ancestorTitles', []) + [assertion.get('title', '')])
                                 status = assertion.get('status', 'passed')
-                                duration = assertion.get('duration', 0) / 1000
+                                # Vitest duration 是毫秒，保持原值 (在報告中會自動格式化)
+                                duration = assertion.get('duration', 0)  # 毫秒
                                 result.test_cases.append(TestCase(
                                     name=f"{file_name} › {test_name}",
                                     status=status,
