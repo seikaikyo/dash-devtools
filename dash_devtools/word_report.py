@@ -91,15 +91,20 @@ def create_test_type_chart(results: Dict) -> Optional[bytes]:
     if not HAS_MATPLOTLIB:
         return None
 
+    # 過濾掉未設定的測試
+    configured_results = {k: v for k, v in results.items() if not v.get('not_configured', False)}
+    if not configured_results:
+        return None
+
     # 設定中文字型
     plt.rcParams['font.sans-serif'] = ['Arial Unicode MS', 'Heiti TC', 'PingFang TC', 'Microsoft JhengHei']
     plt.rcParams['axes.unicode_minus'] = False
 
     fig, ax = plt.subplots(figsize=(8, 4))
 
-    types = list(results.keys())
-    passed = [results[t].get('passed', 0) for t in types]
-    failed = [results[t].get('failed', 0) for t in types]
+    types = list(configured_results.keys())
+    passed = [configured_results[t].get('passed', 0) for t in types]
+    failed = [configured_results[t].get('failed', 0) for t in types]
 
     x = range(len(types))
     width = 0.35
@@ -223,15 +228,34 @@ def generate_word_report(
     total_duration = summary.get('total_duration', 0)
     coverage = summary.get('coverage', 0)
 
+    # 如果 total_duration 為 0，從各測試類型的 test_cases 計算
+    if total_duration == 0:
+        tests = test_results.get('tests', {})
+        for result in tests.values():
+            test_cases = result.get('test_cases', [])
+            total_duration += sum(tc.get('duration', 0) for tc in test_cases)
+
     # 摘要表格
     summary_table = doc.add_table(rows=5, cols=2)
     summary_table.style = 'Table Grid'
+
+    # 智慧格式化總執行時間
+    if total_duration <= 0:
+        duration_str = '-'
+    elif total_duration < 0.001:  # < 1ms
+        duration_str = f'{total_duration * 1000000:.0f}us'
+    elif total_duration < 0.1:  # < 100ms
+        duration_str = f'{total_duration * 1000:.2f}ms'
+    elif total_duration < 1:  # < 1s
+        duration_str = f'{total_duration * 1000:.0f}ms'
+    else:
+        duration_str = f'{total_duration:.1f}s'
 
     summary_data = [
         ('總測試數', str(total_passed + total_failed)),
         ('通過', str(total_passed)),
         ('失敗', str(total_failed)),
-        ('執行時間', f'{total_duration:.1f} 秒'),
+        ('執行時間', duration_str),
         ('程式碼覆蓋率', f'{coverage:.1f}%' if coverage > 0 else 'N/A'),
     ]
 
@@ -267,64 +291,74 @@ def generate_word_report(
 
     tests = test_results.get('tests', {})
 
-    # 結果表格
-    result_table = doc.add_table(rows=len(tests) + 1, cols=5)
-    result_table.style = 'Table Grid'
+    # 過濾掉未設定的測試
+    configured_tests = {k: v for k, v in tests.items() if not v.get('not_configured', False)}
 
-    # 表頭
-    header_row = result_table.rows[0]
-    headers = ['測試類型', '狀態', '通過', '失敗', '時間']
-    for i, header in enumerate(headers):
-        cell = header_row.cells[i]
-        cell.text = header
-        set_cell_shading(cell, '2196F3')
-        for paragraph in cell.paragraphs:
-            for run in paragraph.runs:
-                run.font.bold = True
-                run.font.color.rgb = RGBColor(255, 255, 255)
+    # 如果沒有任何已設定的測試
+    if not configured_tests:
+        p = doc.add_paragraph()
+        run = p.add_run('此專案未設定任何測試框架')
+        run.font.color.rgb = RGBColor(128, 128, 128)
+        run.italic = True
+    else:
+        # 結果表格
+        result_table = doc.add_table(rows=len(configured_tests) + 1, cols=5)
+        result_table.style = 'Table Grid'
 
-    # 資料列
-    type_labels = {
-        'UIT': '單元測試 (UIT)',
-        'SMOKE': '煙霧測試 (Smoke)',
-        'E2E': '端對端測試 (E2E)',
-        'UAT': '驗收測試 (UAT)'
-    }
+        # 表頭
+        header_row = result_table.rows[0]
+        headers = ['測試類型', '狀態', '通過', '失敗', '時間']
+        for i, header in enumerate(headers):
+            cell = header_row.cells[i]
+            cell.text = header
+            set_cell_shading(cell, '2196F3')
+            for paragraph in cell.paragraphs:
+                for run in paragraph.runs:
+                    run.font.bold = True
+                    run.font.color.rgb = RGBColor(255, 255, 255)
 
-    for i, (test_type, result) in enumerate(tests.items(), start=1):
-        row = result_table.rows[i]
-        row.cells[0].text = type_labels.get(test_type, test_type)
+        # 資料列
+        type_labels = {
+            'UIT': '單元測試 (UIT)',
+            'SMOKE': '煙霧測試 (Smoke)',
+            'E2E': '端對端測試 (E2E)',
+            'UAT': '驗收測試 (UAT)'
+        }
 
-        success = result.get('success', True)
-        row.cells[1].text = 'PASS' if success else 'FAIL'
-        # 狀態顏色
-        status_cell = row.cells[1]
-        if success:
-            set_cell_shading(status_cell, 'C8E6C9')  # 淺綠
-        else:
-            set_cell_shading(status_cell, 'FFCDD2')  # 淺紅
+        for i, (test_type, result) in enumerate(configured_tests.items(), start=1):
+            row = result_table.rows[i]
+            row.cells[0].text = type_labels.get(test_type, test_type)
 
-        row.cells[2].text = str(result.get('passed', 0))
-        row.cells[3].text = str(result.get('failed', 0))
-        # 計算總時間 (從 test_cases 或 result.duration)
-        duration = result.get('duration', 0)
-        if duration == 0:
-            test_cases = result.get('test_cases', [])
-            duration = sum(tc.get('duration', 0) for tc in test_cases)
-        # 智慧格式化 (所有單位都是秒，< 1s 顯示 ms)
-        if duration <= 0:
-            row.cells[4].text = "-"
-        elif duration < 0.1:  # < 100ms 顯示 ms
-            row.cells[4].text = f"{duration * 1000:.2f}ms"
-        elif duration < 1:  # < 1s 顯示 ms (整數)
-            row.cells[4].text = f"{duration * 1000:.0f}ms"
-        else:
-            row.cells[4].text = f"{duration:.1f}s"
+            success = result.get('success', True)
+            row.cells[1].text = 'PASS' if success else 'FAIL'
+            # 狀態顏色
+            status_cell = row.cells[1]
+            if success:
+                set_cell_shading(status_cell, 'C8E6C9')  # 淺綠
+            else:
+                set_cell_shading(status_cell, 'FFCDD2')  # 淺紅
+
+            row.cells[2].text = str(result.get('passed', 0))
+            row.cells[3].text = str(result.get('failed', 0))
+            # 計算總時間 (從 test_cases 或 result.duration)
+            duration = result.get('duration', 0)
+            if duration == 0:
+                test_cases = result.get('test_cases', [])
+                duration = sum(tc.get('duration', 0) for tc in test_cases)
+            # 智慧格式化 (所有單位都是秒，< 1s 顯示 ms)
+            if duration <= 0:
+                row.cells[4].text = "-"
+            elif duration < 0.1:  # < 100ms 顯示 ms
+                row.cells[4].text = f"{duration * 1000:.2f}ms"
+            elif duration < 1:  # < 1s 顯示 ms (整數)
+                row.cells[4].text = f"{duration * 1000:.0f}ms"
+            else:
+                row.cells[4].text = f"{duration:.1f}s"
 
     doc.add_paragraph()
 
     # ========== 詳細測試案例列表 (含截圖) ==========
-    for test_type, result in tests.items():
+    for test_type, result in configured_tests.items():
         test_cases = result.get('test_cases', [])
         if not test_cases:
             continue
@@ -613,6 +647,7 @@ def run_and_generate_report(
                 'failed': v.failed,
                 'duration': v.duration,
                 'coverage': v.coverage,
+                'not_configured': v.not_configured,  # 標記未設定的測試
                 'test_cases': [
                     {
                         'name': tc.name,
