@@ -44,8 +44,13 @@ ai = [
     "google-genai>=1.0.0",
     "python-dotenv>=1.0.0",
 ]
+report = [
+    "python-docx>=1.1.0",
+    "matplotlib>=3.8.0",
+    "pillow>=10.0",
+]
 all = [
-    "dash-devtools[dev,vision,ai]",
+    "dash-devtools[dev,vision,ai,report]",
 ]
 
 [project.scripts]

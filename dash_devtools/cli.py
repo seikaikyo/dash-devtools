@@ -710,6 +710,57 @@ def e2e(url, check, timeout, screenshot, output_json):
             raise SystemExit(1)
 
 
+@main.command('test-suite')
+@click.argument('project', type=click.Path(), default='.')
+@click.option('--types', '-t', type=str, default='UIT,Smoke,E2E,UAT',
+              help='測試類型 (逗號分隔): UIT,Smoke,E2E,UAT')
+@click.option('--coverage', '-c', is_flag=True, default=True, help='包含覆蓋率報告')
+@click.option('--report', '-r', type=click.Path(), help='輸出 JSON 報告路徑')
+@click.option('--word', '-w', type=click.Path(), help='輸出 Word 報告路徑')
+@click.option('--no-screenshots', is_flag=True, help='不擷取系統截圖')
+def test_suite(project, types, coverage, report, word, no_screenshots):
+    """四大類型測試套件
+
+    執行完整測試套件，包含：
+    - UIT: 單元測試 (Vitest/Jest/Pytest) + 覆蓋率
+    - Smoke: 煙霧測試 (Playwright smoke.spec.ts)
+    - E2E: 端對端測試 (Playwright mes-system.spec.ts)
+    - UAT: 使用者驗收測試 (Playwright uat.spec.ts)
+
+    Word 報告包含：
+    - 測試摘要與圖表
+    - 所有測試案例明細
+    - 系統截圖 (可用 --no-screenshots 跳過)
+
+    使用範例：
+      dash test-suite .
+      dash test-suite . --types UIT,Smoke
+      dash test-suite . --report ./test-report.json
+      dash test-suite . --word ./test-report.docx
+      dash test-suite . --word report.docx --no-screenshots
+    """
+    from .test_suite import run_test_suite, run_test_suite_report
+
+    test_types = [t.strip() for t in types.split(',')]
+
+    # 如果指定 Word 報告，使用 word_report 模組
+    if word:
+        from .word_report import run_and_generate_report
+        result = run_and_generate_report(
+            project,
+            output_path=word,
+            test_types=test_types,
+            include_screenshots=not no_screenshots
+        )
+    elif report:
+        result = run_test_suite_report(project, output_path=report)
+    else:
+        result = run_test_suite(project, test_types=test_types, coverage=coverage)
+
+    if not result.get('success', True):
+        raise SystemExit(1)
+
+
 @main.command()
 @click.argument('url', type=str)
 @click.option('--category', '-c', type=str, default='performance,accessibility,best-practices,seo',
