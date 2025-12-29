@@ -306,7 +306,20 @@ def generate_word_report(
 
         row.cells[2].text = str(result.get('passed', 0))
         row.cells[3].text = str(result.get('failed', 0))
-        row.cells[4].text = f"{result.get('duration', 0):.1f}s"
+        # 計算總時間 (從 test_cases 或 result.duration)
+        duration = result.get('duration', 0)
+        if duration == 0:
+            test_cases = result.get('test_cases', [])
+            duration = sum(tc.get('duration', 0) for tc in test_cases)
+        # 智慧格式化 (所有單位都是秒，< 1s 顯示 ms)
+        if duration <= 0:
+            row.cells[4].text = "-"
+        elif duration < 0.1:  # < 100ms 顯示 ms
+            row.cells[4].text = f"{duration * 1000:.2f}ms"
+        elif duration < 1:  # < 1s 顯示 ms (整數)
+            row.cells[4].text = f"{duration * 1000:.0f}ms"
+        else:
+            row.cells[4].text = f"{duration:.1f}s"
 
     doc.add_paragraph()
 
@@ -345,10 +358,14 @@ def generate_word_report(
             name_run = p.add_run(f'{i}. {test_name}')
             name_run.font.size = Pt(11)
 
-            # 時間 (小於 1 秒顯示毫秒)
-            if duration:
-                if duration < 1:
-                    time_str = f'{duration:.2f}ms'
+            # 時間 (單位: 秒，小於 1 秒顯示毫秒)
+            if duration and duration > 0:
+                if duration < 0.001:  # < 1ms
+                    time_str = f'{duration * 1000000:.0f}us'
+                elif duration < 0.1:  # < 100ms
+                    time_str = f'{duration * 1000:.2f}ms'
+                elif duration < 1:  # < 1s
+                    time_str = f'{duration * 1000:.0f}ms'
                 else:
                     time_str = f'{duration:.2f}s'
                 time_run = p.add_run(f'  ({time_str})')
