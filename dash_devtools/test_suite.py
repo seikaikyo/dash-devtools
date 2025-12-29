@@ -145,21 +145,36 @@ class TestSuiteRunner:
                 ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
                 clean_output = ansi_escape.sub('', output)
 
-                # 擷取簡潔的終端輸出摘要
+                # 嘗試解析 JSON 並建立摘要
                 terminal_summary = ""
-                summary_lines = []
-                for line in clean_output.split('\n'):
-                    # 保留測試結果行
-                    if any(x in line for x in ['passed', 'failed', 'Tests', 'Duration', 'Coverage']):
-                        summary_lines.append(line.strip())
-                terminal_summary = '\n'.join(summary_lines[-10:])  # 保留最後 10 行
-
-                # 嘗試解析 JSON
                 try:
                     # 找到 JSON 部分 (Vitest JSON 輸出)
                     json_match = re.search(r'(\{[\s\S]*"testResults"[\s\S]*\})', proc.stdout)
                     if json_match:
                         json_data = json.loads(json_match.group(1))
+
+                        # 從 JSON 提取統計數據
+                        result.passed = json_data.get('numPassedTests', 0)
+                        result.failed = json_data.get('numFailedTests', 0)
+                        num_total = json_data.get('numTotalTests', 0)
+                        num_suites = json_data.get('numTotalTestSuites', 0)
+
+                        # 解析覆蓋率 (從 stderr)
+                        coverage_match = re.search(r'All files\s+\|\s+([\d.]+)', clean_output)
+                        if coverage_match:
+                            result.coverage = float(coverage_match.group(1))
+
+                        # 從 JSON 建立人類可讀的摘要
+                        summary_parts = [
+                            f"Test Suites: {num_suites}",
+                            f"Tests: {result.passed} passed" + (f", {result.failed} failed" if result.failed else ""),
+                            f"Total: {num_total} tests"
+                        ]
+                        if result.coverage > 0:
+                            summary_parts.append(f"Coverage: {result.coverage:.1f}%")
+
+                        terminal_summary = '\n'.join(summary_parts)
+
                         for test_file in json_data.get('testResults', []):
                             file_name = Path(test_file.get('name', '')).name
                             for assertion in test_file.get('assertionResults', []):
