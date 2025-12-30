@@ -17,6 +17,7 @@ pip install -e .
 | **健康** | `dash health` | 專案健康評分 (類似 Lighthouse) |
 | **統計** | `dash stats` | 程式碼統計儀表板 |
 | **測試** | `dash test` | 執行測試 (vitest/jest/pytest) |
+| **測試套件** | `dash test-suite` | 四大類測試 (UIT/Smoke/E2E/UAT) + 報告 |
 | **E2E** | `dash e2e` | E2E 煙霧測試 (Puppeteer) |
 | **報告** | `dash report` | 產生完整 HTML 報告 |
 | **監控** | `dash watch` | 即時監控模式 |
@@ -233,6 +234,37 @@ dash test --all
 ```
 
 自動偵測：vitest、jest、karma、pytest
+
+### 四大類測試套件
+
+執行完整測試套件並產生報告：
+
+```bash
+# 執行四大類測試
+dash test-suite .
+
+# 產生 Word 報告
+dash test-suite . --word test-report.docx
+
+# 產生 Markdown 報告
+dash test-suite . --md test-report.md
+
+# 只執行特定類型
+dash test-suite . --types UIT,Smoke
+```
+
+| 測試類型 | 說明 | 測試檔案 |
+|----------|------|----------|
+| UIT | 單元測試 | `*.spec.ts` |
+| Smoke | 煙霧測試 | `e2e/smoke.spec.ts` |
+| E2E | 端對端測試 | `e2e/mes-system.spec.ts` |
+| UAT | 驗收測試 | `e2e/uat.spec.ts` |
+
+報告包含：
+- 測試摘要與統計圖表
+- 各測試類型明細
+- API 測試回應內容
+- 系統截圖
 
 ### E2E 煙霧測試
 
