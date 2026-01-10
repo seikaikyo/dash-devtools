@@ -181,8 +181,8 @@ class QualityValidator:
         issues = []
 
         for file_path in self._get_source_files():
-            # 只檢查 JS/TS 檔案（不檢查 CSS）
-            if file_path.suffix not in ['.js', '.ts', '.jsx', '.tsx']:
+            # 檢查 JS/TS/HTML 檔案（不檢查 CSS）
+            if file_path.suffix not in ['.js', '.ts', '.jsx', '.tsx', '.html']:
                 continue
 
             try:
@@ -216,7 +216,7 @@ class QualityValidator:
 
     def _get_source_files(self):
         """取得所有原始碼檔案"""
-        extensions = ['*.js', '*.ts', '*.jsx', '*.tsx', '*.py', '*.css', '*.scss']
+        extensions = ['*.js', '*.ts', '*.jsx', '*.tsx', '*.py', '*.css', '*.scss', '*.html']
         files = []
 
         for ext in extensions:

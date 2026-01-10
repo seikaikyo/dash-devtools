@@ -6,6 +6,7 @@
 - common: 通用驗證（安全、品質）- 所有專案
 - frontend/vite: Vite + Shoelace
 - frontend/angular: Angular + PrimeNG
+- frontend/gas: GAS (Google Apps Script) + Vue 3 + Shoelace/DaisyUI
 - backend/nodejs: Node.js API
 - backend/python: Python 後端/AI
 """
@@ -13,7 +14,7 @@
 from pathlib import Path
 from .detector import ProjectDetector
 from .common import SecurityValidator, QualityValidator
-from .frontend import ViteValidator, AngularValidator
+from .frontend import ViteValidator, AngularValidator, GasValidator
 from .backend import NodejsValidator, PythonValidator
 
 # 保留舊的匯入（向後相容）
@@ -29,6 +30,7 @@ __all__ = [
     'QualityValidator',
     'ViteValidator',
     'AngularValidator',
+    'GasValidator',
     'NodejsValidator',
     'PythonValidator',
     # 舊架構（向後相容）
@@ -71,7 +73,9 @@ def run_smart_validation(projects, output=None):
         validators.append(QualityValidator(project_path))
 
         # 前端驗證器
-        if project_info['frontend'] == 'angular':
+        if project_info['frontend'] == 'gas':
+            validators.append(GasValidator(project_path))
+        elif project_info['frontend'] == 'angular':
             validators.append(AngularValidator(project_path))
         elif project_info['frontend'] in ['vite', 'vanilla']:
             validators.append(ViteValidator(project_path))

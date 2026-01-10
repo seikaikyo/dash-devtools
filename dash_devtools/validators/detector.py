@@ -1,14 +1,15 @@
 """
-專案類型偵測器 v2.0
+專案類型偵測器 v2.1
 
 自動偵測專案的技術堆疊：
-- 前端：Angular / Vue+Vite / React / Vanilla JS
+- 前端：Angular / Vue+Vite / React / Vanilla JS / GAS (Google Apps Script)
 - 後端：Node.js / Python (FastAPI/Flask/Django)
-- 部署：Vercel Serverless / Vercel Proxy / Render
+- 部署：Vercel Serverless / Vercel Proxy / Render / GAS Web App
 
 新增功能：
 - 區分「Serverless API」與「純 Proxy 閘道」
 - 偵測 Vue 3 + DaisyUI 組合
+- 偵測 GAS 專案（appsscript.json）
 """
 
 import json
@@ -34,6 +35,17 @@ class ProjectDetector:
             'deployment': None,
             'details': {}
         }
+
+        # 優先偵測 GAS 專案（有 appsscript.json）
+        gas = self._detect_gas()
+        if gas:
+            result['types'].add('gas')
+            result['frontend'] = gas['type']
+            result['ui_framework'] = gas.get('ui_framework')
+            result['deployment'] = {'type': 'gas-webapp', 'description': 'Google Apps Script Web App'}
+            result['details']['gas'] = gas
+            result['types'] = list(result['types'])
+            return result
 
         # 偵測前端
         frontend = self._detect_frontend()
@@ -142,6 +154,46 @@ class ProjectDetector:
         if '@chakra-ui/react' in deps:
             return 'chakra'
         return None
+
+    def _detect_gas(self) -> dict | None:
+        """偵測 Google Apps Script 專案"""
+        appsscript_json = self.project_path / 'appsscript.json'
+
+        if not appsscript_json.exists():
+            return None
+
+        try:
+            config = json.loads(appsscript_json.read_text(encoding='utf-8'))
+
+            # 偵測 UI 框架（從 HTML 檔案內容判斷）
+            ui_framework = None
+            html_files = list(self.project_path.glob('*.html'))
+
+            for html_file in html_files:
+                content = html_file.read_text(encoding='utf-8')
+                if 'shoelace' in content.lower() or 'sl-' in content:
+                    ui_framework = 'shoelace'
+                    break
+                elif 'daisyui' in content.lower():
+                    ui_framework = 'daisyui'
+                    break
+
+            # 檢查是否有 Vue
+            has_vue = any('vue' in f.read_text(encoding='utf-8').lower()
+                         for f in html_files if f.exists())
+
+            return {
+                'type': 'gas',
+                'runtime': config.get('runtimeVersion', 'V8'),
+                'webapp': config.get('webapp', {}),
+                'ui_framework': ui_framework,
+                'has_vue': has_vue,
+                'html_files': [f.name for f in html_files],
+                'js_files': [f.name for f in self.project_path.glob('*.js')]
+            }
+
+        except Exception:
+            return None
 
     def _detect_backend(self) -> dict | None:
         """偵測後端技術"""
@@ -293,7 +345,9 @@ class ProjectDetector:
         validators = {'common'}  # 通用驗證器永遠適用
 
         frontend_type = info['frontend']
-        if frontend_type == 'angular':
+        if frontend_type == 'gas':
+            validators.add('frontend.gas')
+        elif frontend_type == 'angular':
             validators.add('frontend.angular')
         elif frontend_type in ['vite', 'vanilla', 'vue-vite', 'vue']:
             validators.add('frontend.vite')
