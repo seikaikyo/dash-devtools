@@ -22,6 +22,7 @@ const path = require("path");
   const checkType = process.argv[4] || "errors";
   const screenshotOnFail = process.argv[5] === "true";
   const screenshotPath = process.argv[6] || "/tmp/e2e-screenshot.png";
+  const isMobile = process.argv[7] === "true";
 
   const result = {
     url: url,
@@ -30,7 +31,9 @@ const path = require("path");
     warnings: [],
     loadTime: 0,
     status: 200,
-    screenshot: null
+    screenshot: null,
+    hasHorizontalScroll: false,
+    isMobile: isMobile
   };
 
   let browser;
@@ -38,7 +41,13 @@ const path = require("path");
   try {
     browser = await puppeteer.launch({ headless: "new" });
     page = await browser.newPage();
-    await page.setViewport({ width: 1920, height: 1080 });
+
+    // 根據是否為手機模式設定 viewport
+    if (isMobile) {
+      await page.setViewport({ width: 375, height: 812, isMobile: true });
+    } else {
+      await page.setViewport({ width: 1920, height: 1080 });
+    }
 
     // 收集 console 錯誤
     page.on("console", msg => {
@@ -68,6 +77,18 @@ const path = require("path");
 
     // 等待額外時間讓 JS 執行
     await new Promise(r => setTimeout(r, 2000));
+
+    // 手機模式：檢查水平滾動（內容溢出）
+    if (isMobile) {
+      result.hasHorizontalScroll = await page.evaluate(() => {
+        return document.documentElement.scrollWidth > document.documentElement.clientWidth;
+      });
+
+      if (result.hasHorizontalScroll) {
+        result.errors.push("手機版檢測到水平滾動 - 內容可能溢出螢幕");
+        result.success = false;
+      }
+    }
 
     // 檢查是否有 Vue/React 錯誤
     const hasVueError = result.errors.some(e =>
@@ -126,7 +147,8 @@ def run_e2e_test(
     timeout: int = 30000,
     check_type: str = "errors",
     screenshot_on_fail: bool = False,
-    screenshot_path: Optional[str] = None
+    screenshot_path: Optional[str] = None,
+    mobile: bool = False
 ) -> Dict:
     """
     執行 E2E 煙霧測試
@@ -137,6 +159,7 @@ def run_e2e_test(
         check_type: 檢查類型 (errors, load)
         screenshot_on_fail: 失敗時是否截圖
         screenshot_path: 截圖儲存路徑 (預設 /tmp/e2e-screenshot-{timestamp}.png)
+        mobile: 是否使用手機版視窗 (375x812)，並檢查水平溢出
 
     Returns:
         測試結果字典，包含 screenshot 欄位 (如有截圖)
@@ -149,7 +172,8 @@ def run_e2e_test(
     # 決定截圖路徑
     if screenshot_on_fail and not screenshot_path:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        screenshot_path = f"/tmp/e2e-screenshot-{timestamp}.png"
+        device_suffix = "-mobile" if mobile else ""
+        screenshot_path = f"/tmp/e2e-screenshot{device_suffix}-{timestamp}.png"
 
     try:
         # 找到有 puppeteer 的目錄
@@ -165,7 +189,8 @@ def run_e2e_test(
         cmd = [
             'node', script_path, url, str(timeout), check_type,
             str(screenshot_on_fail).lower(),
-            screenshot_path or ""
+            screenshot_path or "",
+            str(mobile).lower()
         ]
 
         result = subprocess.run(

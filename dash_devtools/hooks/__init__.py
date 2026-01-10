@@ -151,8 +151,17 @@ if [ -n "$DASH_E2E_URL" ]; then
     echo "[>] 步驟 4/4: E2E 煙霧測試..."
     echo "   測試網址: $DASH_E2E_URL"
 
+    # 桌面版測試
     dash e2e "$DASH_E2E_URL" --timeout 45000
     E2E_RESULT=$?
+
+    # 手機版測試 (如果啟用)
+    if [ "$DASH_MOBILE_E2E" = "1" ] && [ $E2E_RESULT -eq 0 ]; then
+        echo ""
+        echo "   [手機版測試] 375x812"
+        dash e2e "$DASH_E2E_URL" --timeout 45000 --mobile
+        E2E_RESULT=$?
+    fi
 
     if [ $E2E_RESULT -ne 0 ]; then
         if [ "$DASH_STRICT_E2E" = "1" ]; then
@@ -170,6 +179,7 @@ else
     echo "[>] 步驟 4/4: E2E 煙霧測試..."
     echo "   (未設定 E2E 網址，跳過)"
     echo "   使用 --e2e <URL> 安裝 hook 可啟用 E2E 測試"
+    echo "   使用 --mobile-e2e 可同時檢查手機版水平溢出"
     echo ""
 fi
 
@@ -188,7 +198,7 @@ dash scan "$PROJECT_ROOT"
 '''
 
 
-def install_hooks(project_path, strict_test: bool = False, e2e_url: str = None, strict_e2e: bool = False):
+def install_hooks(project_path, strict_test: bool = False, e2e_url: str = None, strict_e2e: bool = False, mobile_e2e: bool = False):
     """安裝 git hooks 到專案
 
     Args:
@@ -196,6 +206,7 @@ def install_hooks(project_path, strict_test: bool = False, e2e_url: str = None, 
         strict_test: 是否啟用嚴格測試模式（測試失敗會阻止推送）
         e2e_url: E2E 測試網址（設定後每次推送會執行煙霧測試）
         strict_e2e: 是否啟用嚴格 E2E 模式（E2E 失敗會阻止推送）
+        mobile_e2e: 是否同時執行手機版 E2E 測試（檢查水平溢出）
     """
     from pathlib import Path
     import stat
@@ -222,6 +233,8 @@ def install_hooks(project_path, strict_test: bool = False, e2e_url: str = None, 
         env_vars.append(f'export DASH_E2E_URL="{e2e_url}"')
         if strict_e2e:
             env_vars.append('export DASH_STRICT_E2E=1')
+        if mobile_e2e:
+            env_vars.append('export DASH_MOBILE_E2E=1')
 
     hook_content = '\n'.join(env_vars) + '\n' + PRE_PUSH_HOOK if env_vars else PRE_PUSH_HOOK
 
@@ -232,5 +245,6 @@ def install_hooks(project_path, strict_test: bool = False, e2e_url: str = None, 
         'success': True,
         'strict_test': strict_test,
         'e2e_url': e2e_url,
-        'strict_e2e': strict_e2e
+        'strict_e2e': strict_e2e,
+        'mobile_e2e': mobile_e2e
     }
