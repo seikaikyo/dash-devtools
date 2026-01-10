@@ -257,7 +257,8 @@ def hooks():
 @click.option('--strict', is_flag=True, help='嚴格模式：測試失敗會阻止推送')
 @click.option('--e2e', type=str, default=None, help='E2E 測試網址 (每次推送會執行煙霧測試)')
 @click.option('--strict-e2e', is_flag=True, help='嚴格 E2E 模式：E2E 失敗會阻止推送')
-def install(project, strict, e2e, strict_e2e):
+@click.option('--mobile-e2e', is_flag=True, help='手機版 E2E 測試：同時檢查手機版水平溢出')
+def install(project, strict, e2e, strict_e2e, mobile_e2e):
     """安裝 Git Hooks 到專案
 
     Pre-push 會執行：
@@ -266,19 +267,21 @@ def install(project, strict, e2e, strict_e2e):
     3. 驗證專案規範
     4. 執行測試
     5. E2E 煙霧測試 (如有設定)
+    6. 手機版 E2E 測試 (如有設定)
 
     使用範例：
       dash hooks install .
       dash hooks install . --strict
       dash hooks install . --e2e https://example.com
       dash hooks install . --e2e https://example.com --strict-e2e
+      dash hooks install . --e2e https://example.com --mobile-e2e
     """
     from .hooks import install_hooks
 
-    result = install_hooks(project, strict_test=strict, e2e_url=e2e, strict_e2e=strict_e2e)
+    result = install_hooks(project, strict_test=strict, e2e_url=e2e, strict_e2e=strict_e2e, mobile_e2e=mobile_e2e)
 
     if result['success']:
-        console.print("[green]✓ Git Hooks 已安裝[/green]")
+        console.print("[green]Git Hooks 已安裝[/green]")
         console.print("  已安裝：pre-commit, pre-push")
         console.print()
         console.print("  [dim]Pre-push 檢查項目：[/dim]")
@@ -287,6 +290,8 @@ def install(project, strict, e2e, strict_e2e):
         console.print("    3. 驗證專案規範")
         console.print("    4. 執行測試")
         console.print("    5. E2E 煙霧測試")
+        if mobile_e2e:
+            console.print("    6. 手機版 E2E 測試 (水平溢出檢查)")
         if strict:
             console.print()
             console.print("  [yellow]嚴格模式已啟用：測試失敗會阻止推送[/yellow]")
@@ -295,8 +300,10 @@ def install(project, strict, e2e, strict_e2e):
             console.print(f"  [cyan]E2E 測試：{e2e}[/cyan]")
             if strict_e2e:
                 console.print("  [yellow]嚴格 E2E 模式已啟用：E2E 失敗會阻止推送[/yellow]")
+            if mobile_e2e:
+                console.print("  [cyan]手機版 E2E 已啟用：會同時檢查 375x812 水平溢出[/cyan]")
     else:
-        console.print(f"[red]✗ 安裝失敗: {result.get('error')}[/red]")
+        console.print(f"[red]安裝失敗: {result.get('error')}[/red]")
 
 
 @main.command()
@@ -649,14 +656,16 @@ def test(project, test_all, coverage, verbose):
               help='檢查類型 (errors=JS錯誤, load=頁面載入, all=全部)')
 @click.option('--timeout', '-t', type=int, default=30000, help='超時時間 (毫秒)')
 @click.option('--screenshot', '-s', is_flag=True, help='失敗時自動截圖')
+@click.option('--mobile', '-m', is_flag=True, help='手機版測試 (375x812)，檢查水平溢出')
 @click.option('--json', 'output_json', is_flag=True, help='輸出 JSON 格式')
-def e2e(url, check, timeout, screenshot, output_json):
+def e2e(url, check, timeout, screenshot, mobile, output_json):
     """E2E 煙霧測試
 
     使用 Puppeteer 載入頁面並檢查：
     - JS console 錯誤 (Vue/React TypeError 等)
     - 頁面載入狀態
     - 載入時間
+    - 手機版水平溢出 (--mobile)
 
     需要先安裝 Node.js 和 Puppeteer:
       npm install -g puppeteer
@@ -666,6 +675,8 @@ def e2e(url, check, timeout, screenshot, output_json):
       dash e2e https://example.com --check load
       dash e2e https://example.com --timeout 60000
       dash e2e https://example.com --screenshot
+      dash e2e https://example.com --mobile
+      dash e2e https://example.com --mobile --screenshot
       dash e2e https://example.com --json
     """
     from .e2e import run_e2e_test, check_puppeteer_installed
@@ -677,13 +688,14 @@ def e2e(url, check, timeout, screenshot, output_json):
         console.print("[yellow]請執行: npm install -g puppeteer[/yellow]")
         raise SystemExit(1)
 
+    device_mode = "手機版 (375x812)" if mobile else "桌面版 (1920x1080)"
     console.print(f"[cyan]E2E 測試: {url}[/cyan]")
-    options = [f"檢查類型: {check}", f"超時: {timeout}ms"]
+    options = [f"裝置: {device_mode}", f"檢查類型: {check}", f"超時: {timeout}ms"]
     if screenshot:
         options.append("失敗截圖: ON")
     console.print(f"[dim]  {' | '.join(options)}[/dim]")
 
-    result = run_e2e_test(url, timeout=timeout, check_type=check, screenshot_on_fail=screenshot)
+    result = run_e2e_test(url, timeout=timeout, check_type=check, screenshot_on_fail=screenshot, mobile=mobile)
 
     if output_json:
         console.print(json_module.dumps(result, indent=2, ensure_ascii=False))
@@ -692,11 +704,22 @@ def e2e(url, check, timeout, screenshot, output_json):
             console.print(f"[green]v 測試通過[/green]")
             console.print(f"  載入時間: {result['loadTime']}ms")
             console.print(f"  HTTP 狀態: {result['status']}")
+            if mobile:
+                console.print(f"  [green]手機版無水平溢出[/green]")
             if result.get('warnings'):
                 console.print(f"  [yellow]警告: {len(result['warnings'])} 個[/yellow]")
         else:
             console.print(f"[red]x 測試失敗[/red]")
             console.print(f"  HTTP 狀態: {result['status']}")
+
+            # 手機版特別提示
+            if result.get('hasHorizontalScroll'):
+                console.print(f"\n[red]手機版水平溢出問題：[/red]")
+                console.print("  內容超出螢幕寬度，請檢查：")
+                console.print("  1. overflow-x: hidden/auto 設定")
+                console.print("  2. 頁籤/表格是否有 flex-wrap: nowrap + overflow-x: auto")
+                console.print("  3. 寬度是否使用 100% 或 max-width")
+
             if result.get('errors'):
                 console.print(f"\n[red]錯誤 ({len(result['errors'])}):[/red]")
                 for err in result['errors'][:5]:
