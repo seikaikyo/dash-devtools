@@ -1,12 +1,16 @@
 """
-Google Apps Script (GAS) 專案驗證器 v1.0
+Google Apps Script (GAS) 專案驗證器 v1.1
+
+支援 UI 框架：
+- DaisyUI + Vue 3 CDN（主要）
+- Shoelace（向下相容）
 
 檢查項目：
-1. Shoelace 綁定語法（禁止 v-model，改用 :value + @sl-input）
-2. Vue isCustomElement 設定
-3. Code.js 版本號管理
-4. 部署 ID 一致性
-5. HTML 模板品質
+1. appsscript.json 設定
+2. Code.js 版本號管理
+3. HTML 模板品質（v-for :key、標籤閉合）
+4. DaisyUI 主題設定
+5. Shoelace 綁定語法（僅限 Shoelace 專案）
 """
 
 import re
@@ -38,10 +42,11 @@ class GasValidator:
         for html_file in self.project_path.glob('*.html'):
             try:
                 content = html_file.read_text(encoding='utf-8')
-                if 'shoelace' in content.lower() or 'sl-' in content:
-                    return 'shoelace'
-                elif 'daisyui' in content.lower():
+                # DaisyUI 優先檢測（更常見）
+                if 'daisyui' in content.lower():
                     return 'daisyui'
+                elif 'shoelace' in content.lower() or 'sl-' in content:
+                    return 'shoelace'
             except Exception:
                 pass
         return None
@@ -67,13 +72,13 @@ class GasValidator:
         # 檢查 appsscript.json
         self.check_appsscript_config()
 
-        # Shoelace 綁定檢查
-        if self.ui_framework == 'shoelace':
+        # UI 框架特定檢查
+        if self.ui_framework == 'daisyui':
+            self.check_daisyui_setup()
+        elif self.ui_framework == 'shoelace':
             self.check_shoelace_binding()
-
-        # Vue 設定檢查
-        if self.has_vue:
-            self.check_vue_custom_element()
+            if self.has_vue:
+                self.check_vue_custom_element()
 
         # Code.js 版本檢查
         self.check_version_management()
@@ -111,10 +116,38 @@ class GasValidator:
             self.result['passed'] = False
             self.result['errors'].append(f'appsscript.json 格式錯誤: {e}')
 
+    def check_daisyui_setup(self):
+        """檢查 DaisyUI 設定"""
+        has_theme = False
+        theme_value = None
+
+        # 檢查 index.html 的 data-theme 設定
+        index_html = self.project_path / 'index.html'
+        if index_html.exists():
+            try:
+                content = index_html.read_text(encoding='utf-8')
+                theme_match = re.search(r'data-theme\s*=\s*["\']([^"\']+)["\']', content)
+                if theme_match:
+                    has_theme = True
+                    theme_value = theme_match.group(1)
+            except Exception:
+                pass
+
+        self.result['checks']['daisyui_setup'] = {
+            'has_theme': has_theme,
+            'theme': theme_value,
+            'ui_framework': 'daisyui'
+        }
+
+        if not has_theme:
+            self.result['warnings'].append(
+                'DaisyUI 未設定 data-theme，建議在 <html> 加入：\n'
+                '  <html data-theme="light">'
+            )
+
     def check_shoelace_binding(self):
-        """檢查 Shoelace 元件綁定語法"""
+        """檢查 Shoelace 元件綁定語法（僅限 Shoelace 專案）"""
         issues = []
-        corrected_examples = []
 
         # 錯誤的 v-model 使用模式
         wrong_patterns = [
@@ -154,30 +187,25 @@ class GasValidator:
                     f"Shoelace 綁定錯誤: {issue['file']} - {issue['component']} 使用 v-model（應改用 :value + @sl-input）"
                 )
 
-            # 提供正確範例
             self.result['warnings'].append(
                 '正確寫法範例：\n'
                 '  <sl-input :value="formData.name" @sl-input="e => formData.name = e.target.value"></sl-input>\n'
-                '  <sl-select :value="formData.type" @sl-change="e => formData.type = e.target.value"></sl-select>\n'
-                '  <sl-checkbox :checked="formData.active" @sl-change="e => formData.active = e.target.checked"></sl-checkbox>'
+                '  <sl-select :value="formData.type" @sl-change="e => formData.type = e.target.value"></sl-select>'
             )
 
     def check_vue_custom_element(self):
-        """檢查 Vue isCustomElement 設定"""
+        """檢查 Vue isCustomElement 設定（僅限 Shoelace 專案）"""
         has_config = False
         config_location = None
 
-        # 搜尋 app.html 或其他可能的設定位置
         for html_file in self.project_path.glob('*.html'):
             try:
                 content = html_file.read_text(encoding='utf-8')
 
-                # 檢查是否有 isCustomElement 設定
                 if 'isCustomElement' in content:
                     has_config = True
                     config_location = html_file.name
 
-                    # 進一步檢查是否正確設定 sl- 前綴
                     if "tag.startsWith('sl-')" in content or "tag.startsWith(\"sl-\")" in content:
                         break
 
@@ -189,7 +217,7 @@ class GasValidator:
             'config_location': config_location
         }
 
-        if self.ui_framework == 'shoelace' and not has_config:
+        if not has_config:
             self.result['warnings'].append(
                 'Vue 未設定 isCustomElement，可能導致 Shoelace 元件警告\n'
                 '  建議在 Vue 初始化時加入：\n'
@@ -255,11 +283,10 @@ class GasValidator:
                 for tag in tags_to_check:
                     open_count = len(re.findall(rf'<{tag}[^>]*(?<!/)>', content))
                     close_count = len(re.findall(rf'</{tag}>', content))
-                    # 自閉合標籤不計
                     self_closing = len(re.findall(rf'<{tag}[^>]*/>', content))
                     open_count -= self_closing
 
-                    if open_count > close_count + 2:  # 容許少量差異（可能是 GAS template 語法）
+                    if open_count > close_count + 2:
                         file_issues.append(f'<{tag}> 標籤可能未正確閉合')
 
                 if file_issues:
