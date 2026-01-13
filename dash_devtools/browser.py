@@ -280,6 +280,65 @@ class AgentBrowser:
             args.extend([f'--{k}', str(v)])
         return self._run(*args)
 
+    # ========== 進階互動 ==========
+
+    def focus(self, ref: str) -> BrowserResult:
+        """聚焦元素"""
+        return self._run('focus', ref)
+
+    def drag(self, from_ref: str, to_ref: str) -> BrowserResult:
+        """拖放元素"""
+        return self._run('drag', from_ref, to_ref)
+
+    def upload(self, ref: str, file_path: str) -> BrowserResult:
+        """上傳檔案"""
+        return self._run('upload', ref, file_path)
+
+    # ========== PDF ==========
+
+    def pdf(self, path: str) -> BrowserResult:
+        """輸出 PDF"""
+        return self._run('pdf', path, timeout=60)
+
+    # ========== Cookie 管理 ==========
+
+    def cookies_get(self) -> BrowserResult:
+        """取得所有 cookies"""
+        return self._run_json('cookies')
+
+    def cookies_set(self, name: str, value: str, **kwargs) -> BrowserResult:
+        """設定 cookie"""
+        args = ['cookies', 'set', name, value]
+        for k, v in kwargs.items():
+            args.extend([f'--{k}', str(v)])
+        return self._run(*args)
+
+    def cookies_clear(self) -> BrowserResult:
+        """清除所有 cookies"""
+        return self._run('cookies', 'clear')
+
+    # ========== JavaScript 執行 ==========
+
+    def evaluate(self, js_code: str) -> BrowserResult:
+        """執行 JavaScript"""
+        return self._run('evaluate', js_code)
+
+    # ========== 網路請求 ==========
+
+    def network(self) -> BrowserResult:
+        """取得網路請求列表"""
+        return self._run_json('network')
+
+    # ========== 會話管理 ==========
+
+    def session_list(self) -> BrowserResult:
+        """列出所有會話"""
+        return self._run_json('session', 'list')
+
+    def session_kill(self, session_name: str) -> BrowserResult:
+        """結束指定會話"""
+        return self._run('session', 'kill', session_name)
+
     # ========== Debug ==========
 
     def console(self) -> BrowserResult:
