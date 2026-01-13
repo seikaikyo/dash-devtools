@@ -1,6 +1,18 @@
 # DashAI DevTools v2.0
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+
+**[English](README.en.md)** | **[日本語](README.ja.md)** | **正體中文**
+
 大許開發工具集 - 統一的開發、驗證、測試、AI 分析工具
+
+## 特色
+
+- **E2E 測試**: 使用 [agent-browser](https://github.com/vercel-labs/agent-browser) (by Vercel Labs) 進行網頁自動化測試
+- **AI 視覺分析**: 截圖 + Gemini AI 進行 UI/UX、無障礙、效能分析
+- **程式碼品質**: 自動檢查安全性、規範、技術債務
+- **四大測試套件**: UIT/Smoke/E2E/UAT 完整測試 + Word/Markdown 報告
 
 ## 安裝
 
@@ -719,6 +731,15 @@ pytest
 # 格式化
 black .
 ```
+
+## 致謝
+
+本專案使用以下開源工具：
+
+- **[agent-browser](https://github.com/vercel-labs/agent-browser)** - Vercel Labs 開發的瀏覽器自動化工具
+- **[Playwright](https://playwright.dev/)** - Microsoft 的 E2E 測試框架
+- **[Google Gemini](https://ai.google.dev/)** - AI 視覺分析引擎
+- **[Rich](https://github.com/Textualize/rich)** - 終端 UI 美化
 
 ## 授權
 
