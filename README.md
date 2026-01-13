@@ -18,7 +18,7 @@ pip install -e .
 | **統計** | `dash stats` | 程式碼統計儀表板 |
 | **測試** | `dash test` | 執行測試 (vitest/jest/pytest) |
 | **測試套件** | `dash test-suite` | 四大類測試 (UIT/Smoke/E2E/UAT) + 報告 |
-| **E2E** | `dash e2e` | E2E 煙霧測試 (Puppeteer) |
+| **E2E** | `dash e2e` | E2E 煙霧測試 (agent-browser) |
 | **報告** | `dash report` | 產生完整 HTML 報告 |
 | **監控** | `dash watch` | 即時監控模式 |
 | **掃描** | `dash scan` | 掃描機敏資料 |
@@ -268,7 +268,7 @@ dash test-suite . --types UIT,Smoke
 
 ### E2E 煙霧測試
 
-使用 Puppeteer 檢查頁面 JS 錯誤：
+使用 agent-browser 檢查頁面 JS 錯誤：
 
 ```bash
 # 基本測試
@@ -280,11 +280,22 @@ dash e2e https://example.com --check load
 # 延長超時
 dash e2e https://example.com --timeout 60000
 
+# 失敗時截圖
+dash e2e https://example.com --screenshot
+
+# 手機版測試
+dash e2e https://example.com --mobile
+
 # JSON 輸出
 dash e2e https://example.com --json
 ```
 
-需要先安裝 Puppeteer：`npm install puppeteer`
+需要先安裝 agent-browser：
+
+```bash
+npm install -g agent-browser
+agent-browser install
+```
 
 ### 專案報告
 
@@ -336,6 +347,73 @@ dash ai review .
 ```
 
 需設定環境變數：`export GEMINI_API_KEY="your-api-key"`
+
+### 視覺 AI 分析
+
+使用 agent-browser 截圖 + Gemini AI 進行 UI/UX 分析：
+
+```bash
+# 基本視覺分析
+dash vision https://example.com
+
+# UI/UX 專家分析
+dash vision https://example.com --type ui_ux
+
+# 無障礙 (WCAG 2.1) 檢查
+dash vision https://example.com --type accessibility
+
+# 效能視覺指標
+dash vision https://example.com --type performance
+
+# 分析本地截圖
+dash vision /path/to/screenshot.png
+```
+
+分析類型：
+
+| 類型 | 說明 |
+|------|------|
+| `general` | 整體 UI/UX 評估 |
+| `ui_ux` | 專業 UI/UX 分析 |
+| `accessibility` | WCAG 2.1 無障礙檢查 |
+| `performance` | 視覺效能指標 |
+
+需要安裝 agent-browser 和設定 Gemini API Key。
+
+### 瀏覽器自動化 API
+
+Python API 提供完整的瀏覽器控制：
+
+```python
+from dash_devtools.browser import AgentBrowser, quick_screenshot
+
+# 快速截圖
+quick_screenshot("https://example.com", "/tmp/screenshot.png")
+
+# 完整控制
+browser = AgentBrowser()
+browser.open("https://example.com")
+browser.snapshot(interactive_only=True)  # 取得可互動元素
+browser.fill("@e1", "test@example.com")  # 填寫表單
+browser.click("@e2")                      # 點擊按鈕
+browser.screenshot("/tmp/result.png")
+browser.close()
+```
+
+視覺分析 API：
+
+```python
+from dash_devtools.vision import analyze_url, compare_screenshots
+
+# 截圖並分析
+result = analyze_url("https://example.com", analysis_type="ui_ux")
+print(result.issues)
+print(result.recommendations)
+
+# 比較兩張截圖 (視覺回歸)
+result = compare_screenshots("before.png", "after.png")
+print(result.analysis)
+```
 
 ### 資料庫遷移
 
