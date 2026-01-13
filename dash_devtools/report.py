@@ -199,18 +199,23 @@ class ReportGenerator:
         return result
 
     def take_screenshots(self, urls: List[str] = None) -> List[ScreenshotResult]:
-        """使用 Puppeteer 截圖"""
+        """使用 agent-browser 截圖"""
+        import shutil
         results = []
+
+        # 檢查 agent-browser 是否安裝
+        if not shutil.which('agent-browser'):
+            console.print("[yellow]agent-browser 未安裝，跳過截圖[/yellow]")
+            console.print("[dim]安裝方式: npm install -g agent-browser && agent-browser install[/dim]")
+            return results
 
         # 如果沒指定 URL，嘗試偵測本地開發伺服器
         if not urls:
-            # 檢查常見的開發伺服器設定
             package_json = self.project_path / 'package.json'
             if package_json.exists():
                 try:
                     pkg = json.loads(package_json.read_text())
                     scripts = pkg.get('scripts', {})
-                    # 常見的開發伺服器埠號
                     if 'dev' in scripts or 'start' in scripts:
                         urls = ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:4200']
                 except Exception:
@@ -223,38 +228,55 @@ class ReportGenerator:
         screenshots_dir = self.report_dir / 'screenshots'
         screenshots_dir.mkdir(parents=True, exist_ok=True)
 
-        # 使用 Puppeteer 截圖
+        # 使用 agent-browser 截圖
         for url in urls:
             screenshot_path = screenshots_dir / f"screenshot_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
 
             try:
-                # 嘗試使用 puppeteer
-                script = f'''
-                const puppeteer = require('puppeteer');
-                (async () => {{
-                    const browser = await puppeteer.launch({{ headless: 'new' }});
-                    const page = await browser.newPage();
-                    await page.setViewport({{ width: 1920, height: 1080 }});
-                    try {{
-                        await page.goto('{url}', {{ waitUntil: 'networkidle2', timeout: 10000 }});
-                        await page.screenshot({{ path: '{screenshot_path}', fullPage: true }});
-                        console.log('success');
-                    }} catch (e) {{
-                        console.log('error: ' + e.message);
-                    }}
-                    await browser.close();
-                }})();
-                '''
-
-                proc = subprocess.run(
-                    ['node', '-e', script],
-                    cwd=self.project_path,
+                # 開啟頁面
+                open_result = subprocess.run(
+                    ['agent-browser', 'open', url],
                     capture_output=True,
                     text=True,
                     timeout=30
                 )
 
-                if 'success' in proc.stdout:
+                if open_result.returncode != 0:
+                    results.append(ScreenshotResult(
+                        url=url,
+                        path="",
+                        success=False,
+                        error=f"無法開啟頁面: {open_result.stderr}"
+                    ))
+                    subprocess.run(['agent-browser', 'close'], capture_output=True)
+                    continue
+
+                # 等待頁面載入
+                subprocess.run(
+                    ['agent-browser', 'wait', '--load', 'networkidle'],
+                    capture_output=True,
+                    timeout=15
+                )
+
+                # 額外等待 JS 渲染
+                subprocess.run(
+                    ['agent-browser', 'wait', '2000'],
+                    capture_output=True,
+                    timeout=5
+                )
+
+                # 截圖
+                screenshot_result = subprocess.run(
+                    ['agent-browser', 'screenshot', str(screenshot_path), '--full'],
+                    capture_output=True,
+                    text=True,
+                    timeout=30
+                )
+
+                # 關閉瀏覽器
+                subprocess.run(['agent-browser', 'close'], capture_output=True)
+
+                if screenshot_result.returncode == 0 and screenshot_path.exists():
                     results.append(ScreenshotResult(
                         url=url,
                         path=str(screenshot_path),
@@ -265,10 +287,19 @@ class ReportGenerator:
                         url=url,
                         path="",
                         success=False,
-                        error=proc.stdout + proc.stderr
+                        error=screenshot_result.stderr or "截圖失敗"
                     ))
 
+            except subprocess.TimeoutExpired:
+                subprocess.run(['agent-browser', 'close'], capture_output=True)
+                results.append(ScreenshotResult(
+                    url=url,
+                    path="",
+                    success=False,
+                    error="操作超時"
+                ))
             except Exception as e:
+                subprocess.run(['agent-browser', 'close'], capture_output=True)
                 results.append(ScreenshotResult(
                     url=url,
                     path="",

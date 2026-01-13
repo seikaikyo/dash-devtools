@@ -661,14 +661,15 @@ def test(project, test_all, coverage, verbose):
 def e2e(url, check, timeout, screenshot, mobile, output_json):
     """E2E 煙霧測試
 
-    使用 Puppeteer 載入頁面並檢查：
+    使用 agent-browser 載入頁面並檢查：
     - JS console 錯誤 (Vue/React TypeError 等)
     - 頁面載入狀態
     - 載入時間
     - 手機版水平溢出 (--mobile)
 
-    需要先安裝 Node.js 和 Puppeteer:
-      npm install -g puppeteer
+    需要先安裝 agent-browser:
+      npm install -g agent-browser
+      agent-browser install
 
     使用範例：
       dash e2e https://example.com
@@ -679,13 +680,13 @@ def e2e(url, check, timeout, screenshot, mobile, output_json):
       dash e2e https://example.com --mobile --screenshot
       dash e2e https://example.com --json
     """
-    from .e2e import run_e2e_test, check_puppeteer_installed
+    from .e2e import run_e2e_test, check_agent_browser_installed
     import json as json_module
 
-    # 檢查 Puppeteer 是否安裝
-    if not check_puppeteer_installed():
-        console.print("[red]Puppeteer 未安裝[/red]")
-        console.print("[yellow]請執行: npm install -g puppeteer[/yellow]")
+    # 檢查 agent-browser 是否安裝
+    if not check_agent_browser_installed():
+        console.print("[red]agent-browser 未安裝[/red]")
+        console.print("[yellow]請執行: npm install -g agent-browser && agent-browser install[/yellow]")
         raise SystemExit(1)
 
     device_mode = "手機版 (375x812)" if mobile else "桌面版 (1920x1080)"
@@ -788,6 +789,46 @@ def test_suite(project, types, coverage, report, word, md, no_screenshots):
         result = run_test_suite_report(project, output_path=report)
     else:
         result = run_test_suite(project, test_types=test_types, coverage=coverage)
+
+    if not result.get('success', True):
+        raise SystemExit(1)
+
+
+@main.command('gas-test')
+@click.argument('project', type=click.Path(), default='${HOME}/Documents/github/GAS/mes')
+@click.option('--types', '-t', type=str, default='UIT,Smoke,E2E,UAT',
+              help='測試類型 (逗號分隔): UIT,Smoke,E2E,UAT')
+@click.option('--word', '-w', type=click.Path(), help='輸出 Word 報告路徑')
+@click.option('--url', '-u', type=str, help='GAS 部署 URL (預設使用 MES 正式環境)')
+def gas_test(project, types, word, url):
+    """GAS MES 四大測試套件
+
+    針對 Google Apps Script MES 系統的專用測試：
+    - UIT: 程式碼靜態分析 (Code.js, Database.js, HTML)
+    - Smoke: 頁面載入測試 (各頁籤)
+    - E2E: 完整流程測試 (登入→操作→驗證)
+    - UAT: 角色權限驗證
+
+    使用範例：
+      dash gas-test
+      dash gas-test /path/to/gas/mes
+      dash gas-test --types UIT,Smoke
+      dash gas-test --word report.docx
+      dash gas-test --url https://script.google.com/macros/s/xxx/exec
+    """
+    from .gas_mes_test import run_gas_test, run_gas_test_with_report
+
+    test_types = [t.strip() for t in types.split(',')]
+
+    if word:
+        result = run_gas_test_with_report(
+            project,
+            output_path=word,
+            test_types=test_types,
+            url=url
+        )
+    else:
+        result = run_gas_test(project, test_types=test_types, url=url)
 
     if not result.get('success', True):
         raise SystemExit(1)
