@@ -27,6 +27,7 @@ pip install -e .
 |------|------|------|
 | **驗證** | `dash validate` | 驗證專案符合開發規範 |
 | **健康** | `dash health` | 專案健康評分 (類似 Lighthouse) |
+| **規格** | `dash spec` | OpenSpec 規格驅動開發 (SDD) |
 | **統計** | `dash stats` | 程式碼統計儀表板 |
 | **測試** | `dash test` | 執行測試 (vitest/jest/pytest) |
 | **測試套件** | `dash test-suite` | 四大類測試 (UIT/Smoke/E2E/UAT) + 報告 |
@@ -198,6 +199,53 @@ npm install -D prisma-dbml-generator
 - 禁止簡體字
 
 ## v2.0 新功能
+
+### OpenSpec 規格驅動開發
+
+使用 Spec-Driven Development (SDD) 工作流程管理功能規格：
+
+```bash
+# 初始化 OpenSpec
+dash spec init .
+
+# 列出活動變更
+dash spec list .
+
+# 互動式儀表板
+dash spec view .
+
+# 顯示變更詳情
+dash spec show . my-feature
+
+# 驗證規格格式
+dash spec validate . my-feature
+
+# 歸檔完成的變更
+dash spec archive . my-feature
+
+# 快速狀態總覽
+dash spec status .
+```
+
+需要先安裝 OpenSpec CLI：
+
+```bash
+npm install -g @fission-ai/openspec@latest
+```
+
+目錄結構：
+
+```
+project/
+└── openspec/
+    ├── specs/      # 功能規格
+    ├── changes/    # 活動變更提案
+    └── archive/    # 已歸檔的變更
+```
+
+整合功能：
+- `dash validate .` 自動偵測 `openspec/` 並驗證規格格式
+- `dash health .` 顯示規格健康度評分
 
 ### 專案健康評分
 

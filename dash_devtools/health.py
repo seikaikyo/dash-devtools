@@ -70,12 +70,19 @@ class HealthChecker:
 
     def check_all(self) -> Dict[str, HealthScore]:
         """執行完整健康檢查"""
-        return {
+        scores = {
             'security': self._check_security(),
             'quality': self._check_quality(),
             'maintainability': self._check_maintainability(),
             'performance': self._check_performance(),
         }
+
+        # 如果有 openspec 目錄，加入規格健康評分
+        openspec_dir = self.project_path / 'openspec'
+        if openspec_dir.exists():
+            scores['spec'] = self._check_spec()
+
+        return scores
 
     def _check_security(self) -> HealthScore:
         """安全性檢查"""
@@ -314,6 +321,79 @@ class HealthChecker:
 
         return HealthScore(
             category='效能',
+            score=max(0, score),
+            issues=issues,
+            recommendations=recommendations
+        )
+
+    def _check_spec(self) -> HealthScore:
+        """OpenSpec 規格健康檢查"""
+        import time
+
+        score = 100
+        issues = []
+        recommendations = []
+
+        openspec_dir = self.project_path / 'openspec'
+        specs_dir = openspec_dir / 'specs'
+        changes_dir = openspec_dir / 'changes'
+
+        # 檢查目錄結構
+        if not specs_dir.exists():
+            score -= 10
+            recommendations.append('建議建立 openspec/specs/ 目錄')
+
+        if not changes_dir.exists():
+            score -= 10
+            recommendations.append('建議建立 openspec/changes/ 目錄')
+
+        # 統計規格數量
+        specs_count = 0
+        if specs_dir.exists():
+            specs_count = len(list(specs_dir.glob('*.md')))
+
+        if specs_count == 0:
+            score -= 15
+            recommendations.append('尚未建立任何功能規格')
+
+        # 統計活動變更
+        changes_count = 0
+        stale_changes = []
+        if changes_dir.exists():
+            now = time.time()
+            seven_days = 7 * 24 * 60 * 60
+
+            for change_file in changes_dir.glob('*.md'):
+                changes_count += 1
+                mtime = change_file.stat().st_mtime
+                if now - mtime > seven_days:
+                    stale_changes.append(change_file.stem)
+
+        # 過期變更扣分
+        if stale_changes:
+            penalty = min(len(stale_changes) * 10, 30)
+            score -= penalty
+            issues.append(f'{len(stale_changes)} 個變更超過 7 天未處理')
+            for change in stale_changes[:3]:
+                recommendations.append(f'處理過期變更: {change}')
+
+        # 檢查規格格式 (簡化版)
+        invalid_specs = 0
+        if specs_dir.exists():
+            for spec_file in specs_dir.glob('*.md'):
+                try:
+                    content = spec_file.read_text(encoding='utf-8')
+                    if not content.startswith('---'):
+                        invalid_specs += 1
+                except Exception:
+                    invalid_specs += 1
+
+        if invalid_specs > 0:
+            score -= invalid_specs * 5
+            issues.append(f'{invalid_specs} 個規格檔案格式不正確')
+
+        return HealthScore(
+            category='規格',
             score=max(0, score),
             issues=issues,
             recommendations=recommendations

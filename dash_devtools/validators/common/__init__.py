@@ -6,5 +6,6 @@
 
 from .security import SecurityValidator
 from .quality import QualityValidator
+from .spec import SpecValidator
 
-__all__ = ['SecurityValidator', 'QualityValidator']
+__all__ = ['SecurityValidator', 'QualityValidator', 'SpecValidator']

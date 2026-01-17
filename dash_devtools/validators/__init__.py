@@ -13,7 +13,7 @@
 
 from pathlib import Path
 from .detector import ProjectDetector
-from .common import SecurityValidator, QualityValidator
+from .common import SecurityValidator, QualityValidator, SpecValidator
 from .frontend import ViteValidator, AngularValidator, GasValidator
 from .backend import NodejsValidator, PythonValidator
 
@@ -28,6 +28,7 @@ __all__ = [
     'ProjectDetector',
     'SecurityValidator',
     'QualityValidator',
+    'SpecValidator',
     'ViteValidator',
     'AngularValidator',
     'GasValidator',
@@ -71,6 +72,11 @@ def run_smart_validation(projects, output=None):
         # 通用驗證器（所有專案都跑）
         validators.append(SecurityValidator(project_path))
         validators.append(QualityValidator(project_path))
+
+        # OpenSpec 驗證器（如果有 openspec/ 目錄）
+        openspec_dir = project_path / 'openspec'
+        if openspec_dir.exists():
+            validators.append(SpecValidator(project_path))
 
         # 前端驗證器
         if project_info['frontend'] == 'gas':
