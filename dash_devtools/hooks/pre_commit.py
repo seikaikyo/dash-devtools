@@ -22,6 +22,12 @@ SENSITIVE_PATTERNS = [
     (r'CLERK_SECRET_KEY\s*=\s*["\']?sk_[a-zA-Z0-9_-]{20,}', 'Clerk Secret Key'),
     (r'-----BEGIN (RSA )?PRIVATE KEY-----', '私鑰'),
     (r'AKIA[0-9A-Z]{16}', 'AWS Access Key'),
+    # Neon Database API Key (napi_ 開頭)
+    (r'napi_[a-zA-Z0-9]{60,}', 'Neon API Key'),
+    # PostgreSQL 連線字串 (含密碼)
+    (r'postgres(?:ql)?://[^:]+:[^@]+@[^\s"\']+', 'PostgreSQL 連線字串'),
+    # Neon PostgreSQL 密碼 (npg_ 開頭)
+    (r'npg_[a-zA-Z0-9]{16,}', 'Neon PostgreSQL 密碼'),
 ]
 
 
