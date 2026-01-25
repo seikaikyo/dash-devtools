@@ -27,7 +27,7 @@ SENSITIVE_PATTERNS = [
     # PostgreSQL 連線字串 (含密碼)
     (r'postgres(?:ql)?://[^:]+:[^@]+@[^\s"\']+', 'PostgreSQL 連線字串'),
     # Neon PostgreSQL 密碼 (npg_ 開頭)
-    (r'npg_[a-zA-Z0-9]{16,}', 'Neon PostgreSQL 密碼'),
+    (r'npg_[a-zA-Z0-9]{10,}', 'Neon PostgreSQL 密碼'),
 ]
 
 
