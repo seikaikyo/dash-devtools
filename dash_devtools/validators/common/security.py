@@ -30,7 +30,7 @@ class SecurityValidator:
         # Neon Database API Key (napi_開頭，64字元)
         (r'napi_[a-zA-Z0-9]{60,}', 'Neon API Key'),
         # PostgreSQL 連線字串 (含密碼)
-        (r'postgres(?:ql)?://[^:]+:[^@]+@[^\s"\']+', 'PostgreSQL 連線字串'),
+        (r'postgres(?:ql)?://[^:<]+:[^@<]+@[^\s"\']+', 'PostgreSQL 連線字串'),
         # Neon PostgreSQL 專用格式
         (r'npg_[a-zA-Z0-9]{10,}', 'Neon PostgreSQL 密碼'),
     ]

@@ -25,7 +25,7 @@ SENSITIVE_PATTERNS = [
     # Neon Database API Key (napi_ 開頭)
     (r'napi_[a-zA-Z0-9]{60,}', 'Neon API Key'),
     # PostgreSQL 連線字串 (含密碼)
-    (r'postgres(?:ql)?://[^:]+:[^@]+@[^\s"\']+', 'PostgreSQL 連線字串'),
+    (r'postgres(?:ql)?://[^:<]+:[^@<]+@[^\s"\']+', 'PostgreSQL 連線字串'),
     # Neon PostgreSQL 密碼 (npg_ 開頭)
     (r'npg_[a-zA-Z0-9]{10,}', 'Neon PostgreSQL 密碼'),
 ]
