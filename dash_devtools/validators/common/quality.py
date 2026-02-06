@@ -10,6 +10,7 @@
 """
 
 import re
+from fnmatch import fnmatch
 from pathlib import Path
 
 
@@ -44,7 +45,7 @@ class QualityValidator:
     def __init__(self, project_path):
         self.project_path = Path(project_path)
         self.project_name = self.project_path.name
-        self.scanignore_paths = self._parse_scanignore()
+        self.scanignore = self._parse_scanignore()
         self.result = {
             'name': self.name,
             'passed': True,
@@ -110,6 +111,12 @@ class QualityValidator:
 
         for file_path in self._get_source_files():
             try:
+                rel_path = str(file_path.relative_to(self.project_path))
+
+                # 檢查 [pattern:簡體字] 排除
+                if self._is_pattern_ignored(rel_path, '簡體字'):
+                    continue
+
                 content = file_path.read_text(encoding='utf-8')
                 found_chars = []
 
@@ -119,7 +126,7 @@ class QualityValidator:
 
                 if found_chars:
                     issues.append({
-                        'file': str(file_path.relative_to(self.project_path)),
+                        'file': rel_path,
                         'chars': found_chars[:5]
                     })
             except Exception:
@@ -217,28 +224,35 @@ class QualityValidator:
                 )
 
     def _parse_scanignore(self):
-        """解析 .scanignore 中的路徑排除規則"""
+        """解析 .scanignore 檔案"""
         scanignore_file = self.project_path / '.scanignore'
-        paths = []
+        result = {'paths': [], 'pattern_paths': []}
+
         if not scanignore_file.exists():
-            return paths
+            return result
+
         try:
             for line in scanignore_file.read_text(encoding='utf-8').splitlines():
                 line = line.strip()
                 if not line or line.startswith('#'):
                     continue
-                # 跳過 [pattern:xxx] 格式（安全掃描用）
-                if line.startswith('[pattern:'):
-                    continue
-                paths.append(line)
+
+                pattern_match = re.match(r'^\[pattern:(.+?)\]\s+(.+)$', line)
+                if pattern_match:
+                    pattern_name = pattern_match.group(1).strip()
+                    path_glob = pattern_match.group(2).strip()
+                    result['pattern_paths'].append((pattern_name, path_glob))
+                else:
+                    result['paths'].append(line)
         except Exception:
             pass
-        return paths
+
+        return result
 
     def _is_scanignored(self, file_path):
-        """檢查檔案是否被 .scanignore 排除"""
+        """檢查檔案是否被 .scanignore 全排除"""
         rel_path = str(file_path.relative_to(self.project_path))
-        for pattern in self.scanignore_paths:
+        for pattern in self.scanignore['paths']:
             # 目錄排除（以 / 結尾）
             if pattern.endswith('/'):
                 if rel_path.startswith(pattern) or f'/{pattern}' in f'/{rel_path}':
@@ -250,6 +264,16 @@ class QualityValidator:
             else:
                 # 只比對檔名部分
                 if file_path.name == pattern:
+                    return True
+        return False
+
+    def _is_pattern_ignored(self, rel_path, pattern_name):
+        """檢查檔案是否被 .scanignore 的特定 pattern 排除"""
+        for p_name, p_glob in self.scanignore['pattern_paths']:
+            if p_name == pattern_name:
+                if fnmatch(rel_path, p_glob):
+                    return True
+                if rel_path == p_glob:
                     return True
         return False
 

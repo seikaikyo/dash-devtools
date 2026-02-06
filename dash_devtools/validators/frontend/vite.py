@@ -17,6 +17,7 @@ Vite 專案驗證器 v2.0
 import re
 import json
 import subprocess
+from fnmatch import fnmatch
 from pathlib import Path
 
 
@@ -59,6 +60,7 @@ class ViteValidator:
         self.project_path = Path(project_path)
         self.project_name = self.project_path.name
         self.src_path = self.project_path / 'src'
+        self.scanignore = self._parse_scanignore()
         self.result = {
             'name': self.name,
             'passed': True,
@@ -399,6 +401,10 @@ class ViteValidator:
                     content = file_path.read_text(encoding='utf-8')
                     rel_path = str(file_path.relative_to(self.project_path))
 
+                    # 檢查 [pattern:HTML 標籤不完整] 排除
+                    if self._is_pattern_ignored(rel_path, 'HTML 標籤不完整'):
+                        continue
+
                     for tag in tags_to_check:
                         open_count = len(re.findall(rf'<{tag}[^>]*>', content))
                         close_count = len(re.findall(rf'</{tag}>', content))
@@ -491,6 +497,42 @@ class ViteValidator:
             self.result['warnings'].append(f'CSS Bundle 過大: {css_kb:.2f} KB (建議 < 200 KB)')
         if js_kb > 500:
             self.result['warnings'].append(f'JS Bundle 過大: {js_kb:.2f} KB (建議 < 500 KB)')
+
+    def _parse_scanignore(self):
+        """解析 .scanignore 檔案"""
+        scanignore_file = self.project_path / '.scanignore'
+        result = {'paths': [], 'pattern_paths': []}
+
+        if not scanignore_file.exists():
+            return result
+
+        try:
+            for line in scanignore_file.read_text(encoding='utf-8').splitlines():
+                line = line.strip()
+                if not line or line.startswith('#'):
+                    continue
+
+                pattern_match = re.match(r'^\[pattern:(.+?)\]\s+(.+)$', line)
+                if pattern_match:
+                    pattern_name = pattern_match.group(1).strip()
+                    path_glob = pattern_match.group(2).strip()
+                    result['pattern_paths'].append((pattern_name, path_glob))
+                else:
+                    result['paths'].append(line)
+        except Exception:
+            pass
+
+        return result
+
+    def _is_pattern_ignored(self, rel_path, pattern_name):
+        """檢查檔案是否被 .scanignore 的特定 pattern 排除"""
+        for p_name, p_glob in self.scanignore['pattern_paths']:
+            if p_name == pattern_name:
+                if fnmatch(rel_path, p_glob):
+                    return True
+                if rel_path == p_glob:
+                    return True
+        return False
 
     def _should_skip(self, file_path):
         """檢查是否應該跳過該檔案"""

@@ -9,6 +9,7 @@
 """
 
 import re
+from fnmatch import fnmatch
 from pathlib import Path
 
 
@@ -55,6 +56,7 @@ class SecurityValidator:
     def __init__(self, project_path):
         self.project_path = Path(project_path)
         self.project_name = self.project_path.name
+        self.scanignore = self._parse_scanignore()
         self.result = {
             'name': self.name,
             'passed': True,
@@ -115,7 +117,14 @@ class SecurityValidator:
                 content = file_path.read_text(encoding='utf-8')
                 rel_path = str(file_path.relative_to(self.project_path))
 
+                # 全排除檢查
+                if self._is_scanignored(rel_path, None):
+                    continue
+
                 for pattern, desc in self.SENSITIVE_PATTERNS:
+                    # 特定 pattern 排除檢查
+                    if self._is_scanignored(rel_path, desc):
+                        continue
                     matches = re.findall(pattern, content)
                     if matches:
                         issues.append({
@@ -192,6 +201,55 @@ class SecurityValidator:
                     files.append(f)
 
         return files
+
+    def _parse_scanignore(self):
+        """解析 .scanignore 檔案"""
+        scanignore_file = self.project_path / '.scanignore'
+        result = {'paths': [], 'pattern_paths': []}
+
+        if not scanignore_file.exists():
+            return result
+
+        try:
+            for line in scanignore_file.read_text(encoding='utf-8').splitlines():
+                line = line.strip()
+                if not line or line.startswith('#'):
+                    continue
+
+                pattern_match = re.match(r'^\[pattern:(.+?)\]\s+(.+)$', line)
+                if pattern_match:
+                    pattern_name = pattern_match.group(1).strip()
+                    path_glob = pattern_match.group(2).strip()
+                    result['pattern_paths'].append((pattern_name, path_glob))
+                else:
+                    result['paths'].append(line)
+        except Exception:
+            pass
+
+        return result
+
+    def _is_scanignored(self, rel_path, pattern_name):
+        """檢查檔案是否在 .scanignore 中"""
+        # 全排除路徑
+        for glob_pattern in self.scanignore['paths']:
+            if glob_pattern.endswith('/'):
+                if rel_path.startswith(glob_pattern) or rel_path.startswith(glob_pattern.rstrip('/')):
+                    return True
+            if fnmatch(rel_path, glob_pattern):
+                return True
+            if rel_path.startswith(glob_pattern.rstrip('/') + '/'):
+                return True
+
+        # 特定 pattern 排除
+        if pattern_name:
+            for p_name, p_glob in self.scanignore['pattern_paths']:
+                if p_name == pattern_name:
+                    if fnmatch(rel_path, p_glob):
+                        return True
+                    if rel_path == p_glob:
+                        return True
+
+        return False
 
     def _is_gitignored(self, file_path):
         """檢查檔案是否在 .gitignore 中"""
