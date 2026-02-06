@@ -18,18 +18,40 @@ console = Console()
 
 # 預設專案清單
 DEFAULT_PROJECTS = [
-    '${HOME}/Documents/github/VAC',
-    '${HOME}/Documents/github/RFID',
-    '${HOME}/Documents/github/jinkochino',
+    # 工廠系統
+    '${HOME}/Documents/github/MES',
     '${HOME}/Documents/github/MCS',
     '${HOME}/Documents/github/MIDS',
-    '${HOME}/Documents/github/GHG',
-    '${HOME}/Documents/github/DEMO_8D',
+    '${HOME}/Documents/github/RFID',
+    '${HOME}/Documents/github/VAC',
+    '${HOME}/Documents/github/EAP',
     '${HOME}/Documents/github/BPM',
     '${HOME}/Documents/github/RMS',
+    '${HOME}/Documents/github/DEMO_8D',
+    '${HOME}/Documents/github/AOI-8D',
+    '${HOME}/Documents/github/MSW',
+    '${HOME}/Documents/github/SPC',
+    '${HOME}/Documents/github/SSL',
+    # 平台服務
     '${HOME}/Documents/github/SSO',
-    '${HOME}/Documents/github/EAP',
-    '${HOME}/Documents/github/MES',
+    '${HOME}/Documents/github/API_Center',
+    '${HOME}/Documents/github/demo-mcp',
+    '${HOME}/Documents/github/demo-recruit',
+    '${HOME}/Documents/github/demo-ui',
+    '${HOME}/Documents/github/demo-vision',
+    # 產品專案
+    '${HOME}/Documents/github/Dash-GHG',
+    '${HOME}/Documents/github/DashAstro',
+    '${HOME}/Documents/github/DashTrade',
+    '${HOME}/Documents/github/VisionAI',
+    '${HOME}/Documents/github/SEO',
+    # 個人專案
+    '${HOME}/Documents/github/sinoauto',
+    '${HOME}/Documents/github/jlpt-n1-learner',
+    '${HOME}/Documents/github/sukuyodo',
+    '${HOME}/Documents/github/jinkochino',
+    '${HOME}/Documents/github/demo-ai',
+    '${HOME}/Documents/github/job-crawler',
 ]
 
 

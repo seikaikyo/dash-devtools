@@ -34,7 +34,8 @@ class QualityValidator:
     # 忽略目錄
     IGNORE_DIRS = [
         'node_modules', '.git', 'dist', 'build', '.next', '__pycache__',
-        '.angular', 'venv', '.venv', '.cache', 'coverage'
+        '.angular', 'venv', '.venv', '.cache', 'coverage',
+        'playwright-report'
     ]
 
     # 日文專案（允許使用日文漢字）
@@ -43,6 +44,7 @@ class QualityValidator:
     def __init__(self, project_path):
         self.project_path = Path(project_path)
         self.project_name = self.project_path.name
+        self.scanignore_paths = self._parse_scanignore()
         self.result = {
             'name': self.name,
             'passed': True,
@@ -214,6 +216,43 @@ class QualityValidator:
                     f"  {issue['file']}: {''.join(issue['emojis'])}"
                 )
 
+    def _parse_scanignore(self):
+        """解析 .scanignore 中的路徑排除規則"""
+        scanignore_file = self.project_path / '.scanignore'
+        paths = []
+        if not scanignore_file.exists():
+            return paths
+        try:
+            for line in scanignore_file.read_text(encoding='utf-8').splitlines():
+                line = line.strip()
+                if not line or line.startswith('#'):
+                    continue
+                # 跳過 [pattern:xxx] 格式（安全掃描用）
+                if line.startswith('[pattern:'):
+                    continue
+                paths.append(line)
+        except Exception:
+            pass
+        return paths
+
+    def _is_scanignored(self, file_path):
+        """檢查檔案是否被 .scanignore 排除"""
+        rel_path = str(file_path.relative_to(self.project_path))
+        for pattern in self.scanignore_paths:
+            # 目錄排除（以 / 結尾）
+            if pattern.endswith('/'):
+                if rel_path.startswith(pattern) or f'/{pattern}' in f'/{rel_path}':
+                    return True
+            # 精確檔名比對
+            elif '/' in pattern:
+                if rel_path == pattern:
+                    return True
+            else:
+                # 只比對檔名部分
+                if file_path.name == pattern:
+                    return True
+        return False
+
     def _get_source_files(self):
         """取得所有原始碼檔案"""
         extensions = ['*.js', '*.ts', '*.jsx', '*.tsx', '*.py', '*.css', '*.scss', '*.html']
@@ -221,8 +260,11 @@ class QualityValidator:
 
         for ext in extensions:
             for f in self.project_path.rglob(ext):
-                if not any(ignore in str(f) for ignore in self.IGNORE_DIRS):
-                    files.append(f)
+                if any(ignore in str(f) for ignore in self.IGNORE_DIRS):
+                    continue
+                if self._is_scanignored(f):
+                    continue
+                files.append(f)
 
         return files
 
@@ -232,13 +274,17 @@ class QualityValidator:
         config_patterns = [
             'vite.config', 'tailwind.config', 'postcss.config',
             'eslint.config', 'prettier.config', 'jest.config',
-            'webpack.config', 'rollup.config', 'tsconfig'
+            'webpack.config', 'rollup.config', 'tsconfig',
+            'karma.conf', 'playwright.config', 'vitest.config',
+            'babel.config', 'nuxt.config', 'next.config',
+            'cypress.config', 'angular.json'
         ]
         if any(name.startswith(p) for p in config_patterns):
             return True
 
-        # kebab-case
-        if re.match(r'^[a-z][a-z0-9-]*$', name):
+        # kebab-case 含 dot-separated 後綴
+        # 如 xxx.component, xxx.service.spec, xxx.e2e 等
+        if re.match(r'^[a-z][a-z0-9-]*(\.[a-z][a-z0-9-]*)*$', name):
             return True
         # PascalCase
         if re.match(r'^[A-Z][a-zA-Z0-9]*$', name):
