@@ -9,7 +9,7 @@ Pre-push 檢查
 使用 --strict 選項強制測試通過才能推送
 """
 
-from .pre_commit import run_pre_commit_check, SENSITIVE_PATTERNS
+from .pre_commit import run_pre_commit_check, SENSITIVE_PATTERNS, parse_scanignore, is_scan_ignored
 import re
 import os
 import subprocess
@@ -202,6 +202,9 @@ def run_pre_push_check(project_path):
     ]
     ignore_files = ['.env.example', '.env.sample', '.env.template']
 
+    # 讀取 .scanignore
+    scanignore = parse_scanignore(project_path)
+
     # 讀取 .gitignore 檔案
     gitignore_patterns = []
     gitignore_file = project / '.gitignore'
@@ -235,6 +238,8 @@ def run_pre_push_check(project_path):
 
     for ext in extensions:
         for file_path in project.rglob(ext):
+            rel_path = str(file_path.relative_to(project))
+
             # 跳過忽略的目錄
             if any(ignore in str(file_path) for ignore in ignore_dirs):
                 continue
@@ -244,14 +249,20 @@ def run_pre_push_check(project_path):
             # 跳過 .gitignore 中的檔案
             if is_gitignored(file_path):
                 continue
+            # 跳過 .scanignore 全排除的檔案
+            if is_scan_ignored(rel_path, None, scanignore):
+                continue
 
             try:
                 content = file_path.read_text(encoding='utf-8')
                 for pattern, desc in SENSITIVE_PATTERNS:
+                    # 跳過 .scanignore 特定 pattern 排除
+                    if is_scan_ignored(rel_path, desc, scanignore):
+                        continue
                     matches = re.findall(pattern, content)
                     if matches:
                         issues.append({
-                            'file': str(file_path.relative_to(project)),
+                            'file': rel_path,
                             'type': desc,
                             'count': len(matches)
                         })
