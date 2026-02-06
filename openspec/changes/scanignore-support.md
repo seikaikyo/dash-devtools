@@ -1,7 +1,7 @@
 ---
 title: dash scan 加入 .scanignore 機制
 type: feature
-status: in-progress
+status: completed
 created: 2026-02-06
 ---
 
@@ -40,7 +40,7 @@ external/neon-skills/
 
 ## Checklist
 
-- [ ] 實作 `.scanignore` 解析函數
-- [ ] 整合到 `pre_push.py`
-- [ ] 整合到 `pre_commit.py`
-- [ ] dash-skills 建立 `.scanignore` 驗證
+- [x] 實作 `.scanignore` 解析函數
+- [x] 整合到 `pre_push.py`
+- [x] 整合到 `pre_commit.py`
+- [x] dash-skills 建立 `.scanignore` 驗證
