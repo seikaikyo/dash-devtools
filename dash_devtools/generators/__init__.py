@@ -47,7 +47,7 @@ def generate_claude_md(project_path):
 
 def get_release_status():
     """取得版本狀態"""
-    projects_dir = Path('${HOME}/Documents/github')
+    projects_dir = Path.home() / 'Documents' / 'github'
     status = {}
 
     for project in projects_dir.iterdir():

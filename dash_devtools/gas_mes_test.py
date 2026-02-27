@@ -27,7 +27,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 
 console = Console()
 
-# GAS MES 部署 URL
+# GAS MES 部署 URL (請替換為實際 URL)
 GAS_MES_URL = "https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec"
 
 # ========== 模組與 API 定義 ==========
@@ -261,16 +261,17 @@ class GASMESTestRunner:
 
     def _get_puppeteer_cwd(self) -> str:
         """取得有安裝 Puppeteer 的目錄"""
+        base = Path.home() / 'Documents' / 'github'
         check_dirs = [
-            '${HOME}/Documents/github/demo-vision',
-            '${HOME}/Documents/github/MES',
+            str(base / 'demo-vision'),
+            str(base / 'demo-project'),
             str(self.project_path),
         ]
         for check_dir in check_dirs:
             node_modules = Path(check_dir) / 'node_modules' / 'puppeteer'
             if node_modules.exists():
                 return check_dir
-        return '${HOME}/Documents/github/demo-vision'
+        return str(base / 'demo-vision')
 
     def _run_puppeteer_test(self, script: str, timeout: int = 60000) -> Dict:
         """執行 Puppeteer 測試腳本"""

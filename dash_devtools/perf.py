@@ -192,7 +192,7 @@ def run_perf_test(
 
 def get_node_cwd() -> str:
     """取得有 Node.js 的工作目錄"""
-    return '${HOME}/Documents/github/demo-vision'
+    return str(Path.home() / 'Documents' / 'github' / 'demo-vision')
 
 
 def get_score_color(score: int) -> str:

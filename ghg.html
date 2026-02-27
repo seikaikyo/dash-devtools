@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Demo Corp企業 GHG 盤查系統</title>
+    <title>Demo GHG 盤查系統</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.15.0/cdn/themes/light.css" />
     <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.15.0/cdn/shoelace.js"></script>
     
@@ -146,8 +146,8 @@
                 </div>
                 <div style="display: flex; gap: 10px;">
                     <sl-select value="shanhua" size="small" style="width: 150px;">
-                        <sl-option value="shanhua">台南範例工廠</sl-option>
-                        <sl-option value="dayun">工廠B廠區</sl-option>
+                        <sl-option value="factory-a">範例工廠 A</sl-option>
+                        <sl-option value="factory-b">範例工廠 B</sl-option>
                     </sl-select>
                     <sl-button variant="primary" size="small" outline>
                         <sl-icon name="download" slot="prefix"></sl-icon> 匯出報告
@@ -476,7 +476,7 @@
             </sl-select>
             <br>
             
-            <sl-input label="排放源名稱" placeholder="例如：移動設備 A-01" required></sl-input>
+            <sl-input label="排放源名稱" placeholder="例如：設備 A-01" required></sl-input>
             <br>
             
             <div class="grid-2" style="margin-bottom: 0;">
