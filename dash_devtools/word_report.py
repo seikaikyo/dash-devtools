@@ -574,8 +574,6 @@ const puppeteer = require("puppeteer");
             # 找有 puppeteer 的目錄
             base = Path.home() / 'Documents' / 'github'
             puppeteer_dirs = [
-                str(base / 'demo-vision'),
-                str(base / 'demo-project'),
                 project_path
             ]
 

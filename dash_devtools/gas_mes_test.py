@@ -263,15 +263,13 @@ class GASMESTestRunner:
         """取得有安裝 Puppeteer 的目錄"""
         base = Path.home() / 'Documents' / 'github'
         check_dirs = [
-            str(base / 'demo-vision'),
-            str(base / 'demo-project'),
             str(self.project_path),
         ]
         for check_dir in check_dirs:
             node_modules = Path(check_dir) / 'node_modules' / 'puppeteer'
             if node_modules.exists():
                 return check_dir
-        return str(base / 'demo-vision')
+        return str(self.project_path)
 
     def _run_puppeteer_test(self, script: str, timeout: int = 60000) -> Dict:
         """執行 Puppeteer 測試腳本"""

@@ -21,10 +21,21 @@ GITHUB_BASE = Path.home() / 'Documents' / 'github'
 
 # 預設專案清單 (使用動態基礎路徑)
 DEFAULT_PROJECT_NAMES = [
-    # 系統範例
-    'demo-project-1',
-    'demo-project-2',
-    'demo-project-3',
+    'DashAstro',
+    'DashTrade',
+    'sinoauto',
+    'jlpt-n1-learner',
+    'sukuyodo',
+    'jinkochino',
+    'job-crawler',
+    'dashai-portfolio',
+    'ai-english-tutor',
+    'ai-red-team',
+    'toeic-practice',
+    'dash-devtools',
+    'dash-doc-generator',
+    'dash-skills',
+    'git-security-hooks',
 ]
 
 DEFAULT_PROJECTS = [str(GITHUB_BASE / name) for name in DEFAULT_PROJECT_NAMES]
