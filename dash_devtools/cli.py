@@ -1434,5 +1434,101 @@ def doctor():
     console.print("[green]診斷完成！[/green]")
 
 
+# ==================== Monitor ====================
+
+@main.group()
+def monitor():
+    """UptimeRobot 服務監控管理
+
+    管理 Render 免費方案的 keep-alive 監控 (UptimeRobot)。
+
+    子指令：
+      list      列出所有監控
+      add       新增 Render 服務監控
+      remove    移除監控
+    """
+    pass
+
+
+@monitor.command('list')
+def monitor_list():
+    """列出所有 UptimeRobot 監控"""
+    from .monitor import list_monitors
+
+    try:
+        monitors = list_monitors()
+    except RuntimeError as e:
+        console.print(f"[red]x {e}[/red]")
+        raise SystemExit(1)
+
+    if not monitors:
+        console.print("[dim]尚無任何監控[/dim]")
+        return
+
+    table = Table(title="UptimeRobot 監控清單")
+    table.add_column("名稱", style="cyan")
+    table.add_column("URL", style="dim")
+    table.add_column("狀態")
+    table.add_column("間隔", justify="right")
+
+    for m in monitors:
+        status_style = "green" if m["status_code"] == 2 else "red"
+        table.add_row(
+            m["name"],
+            m["url"],
+            f"[{status_style}]{m['status']}[/{status_style}]",
+            f"{m['interval'] // 60}m",
+        )
+
+    console.print(table)
+
+
+@monitor.command('add')
+@click.argument('service_name')
+@click.option('--url', '-u', default=None, help='自訂監控 URL (預設: https://{name}.onrender.com/health)')
+def monitor_add(service_name, url):
+    """新增 Render 服務監控
+
+    SERVICE_NAME: Render 服務名稱 (如 sukuyodo-backend)
+    """
+    from .monitor import add_monitor
+
+    try:
+        result = add_monitor(service_name, url)
+    except RuntimeError as e:
+        console.print(f"[red]x {e}[/red]")
+        raise SystemExit(1)
+
+    if result["success"]:
+        console.print(f"[green]v 已新增監控: {result['name']}[/green]")
+        console.print(f"  URL: {result['url']}")
+        console.print(f"  間隔: 5 分鐘 (HEAD)")
+    else:
+        console.print(f"[yellow]! {result['error']}[/yellow]")
+
+
+@monitor.command('remove')
+@click.argument('service_name')
+def monitor_remove(service_name):
+    """移除監控
+
+    SERVICE_NAME: monitor 名稱或 ID
+    """
+    from .monitor import remove_monitor
+
+    try:
+        result = remove_monitor(service_name)
+    except RuntimeError as e:
+        console.print(f"[red]x {e}[/red]")
+        raise SystemExit(1)
+
+    if result["success"]:
+        console.print(f"[green]v 已移除監控: {result['name']}[/green]")
+        console.print(f"  URL: {result['url']}")
+    else:
+        console.print(f"[red]x {result['error']}[/red]")
+        raise SystemExit(1)
+
+
 if __name__ == '__main__':
     main()
