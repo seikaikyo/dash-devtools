@@ -125,6 +125,19 @@ class PythonValidator:
                 if '@app.exception_handler' not in content and 'exception_handler' not in content:
                     issues.append('建議加入全域錯誤處理')
 
+                # 檢查 Render 部署的 HEAD /health 支援
+                if self._is_render_project():
+                    has_health_head = (
+                        re.search(r'api_route\s*\(\s*["\']\/health["\'].*HEAD', content)
+                        or re.search(r'\.head\s*\(\s*["\']\/health["\']', content)
+                    )
+                    if not has_health_head:
+                        issues.append(
+                            'Render 部署需要 HEAD /health 端點 '
+                            '(UptimeRobot 防休眠)，'
+                            '請改用 @app.api_route("/health", methods=["GET", "HEAD"])'
+                        )
+
             except Exception:
                 pass
 
@@ -372,6 +385,33 @@ class PythonValidator:
             self.result['warnings'].append(
                 'Model 檔案比最新遷移更新，可能需要產生新遷移 (dash db generate -m "描述")'
             )
+
+    def _is_render_project(self) -> bool:
+        """偵測是否為 Render 部署的專案"""
+        # 檢查 render.yaml
+        if (self.project_path / 'render.yaml').exists():
+            return True
+        # 檢查 git remote 是否有 Render 相關設定
+        try:
+            result = subprocess.run(
+                ['git', 'remote', '-v'],
+                capture_output=True, text=True, timeout=5,
+                cwd=str(self.project_path)
+            )
+            # 有 git repo 且不是 Vercel 專案（有 vercel.json）才檢查
+            # Render 專案特徵：後端 Python + 無 vercel.json
+            if result.returncode == 0 and 'github.com' in result.stdout:
+                # 後端目錄通常不會有 vercel.json
+                parent = self.project_path.parent
+                has_vercel = (
+                    (self.project_path / 'vercel.json').exists()
+                    or (parent / 'vercel.json').exists()
+                )
+                if not has_vercel:
+                    return True
+        except Exception:
+            pass
+        return False
 
     def _should_skip(self, file_path):
         """檢查是否應該跳過該檔案"""
