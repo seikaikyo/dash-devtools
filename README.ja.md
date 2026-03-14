@@ -1,4 +1,4 @@
-# DashAI DevTools v2.0
+# DashAI DevTools v2.1
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
@@ -220,27 +220,29 @@ dash ai review .
 
 必要: `export GEMINI_API_KEY="your-api-key"`
 
-## Git Hooks
+## Git Hooks (Pre-push v3)
 
-自動検証のためのpre-pushフックインストール:
+グローバルpre-pushフック。全プロジェクトのプッシュ前に自動チェック:
 
 ```bash
-# 基本インストール
-dash hooks install .
-
-# 厳格モード: テスト失敗でプッシュブロック
-dash hooks install . --strict
-
-# E2Eスモークテスト有効化
-dash hooks install . --e2e https://your-app.vercel.app
+# グローバルフックのインストール
+git config --global core.hooksPath ~/.config/git/hooks
+cp scripts/pre-push ~/.config/git/hooks/pre-push
+chmod +x ~/.config/git/hooks/pre-push
 ```
 
-プッシュ前に自動実行:
-1. 絵文字チェック
-2. 機密データスキャン (GitGuardianまたはローカルルール)
-3. プロジェクト規約検証
-4. テスト (vitest/jest/pytest)
-5. E2Eスモークテスト (設定時)
+プロジェクトタイプに応じてステップ数を動的に調整:
+
+| ステップ | フロントエンド | バックエンド | 説明 |
+|---------|:---:|:---:|------|
+| 絵文字スキャン | v | v | git diff変更ファイル + コミットメッセージのみ |
+| コミットメッセージ形式 | v | v | 絵文字禁止、`type: 説明` 形式を推奨 |
+| 機密データスキャン | v | v | GitGuardianまたはローカルルール |
+| TypeScriptビルド | v | - | vue-tsc / ng build / tsc（自動検出） |
+| Python Ruff lint | - | v | check + format |
+| プロジェクト検証 | v | v | dash validate（簡体字・AI痕跡・品質） |
+
+エラーはプッシュをブロック、警告は通知のみ。各ステップに経過時間を表示。
 
 ## Claude Code統合
 
@@ -275,6 +277,37 @@ black .
 - **[Playwright](https://playwright.dev/)** - MicrosoftのE2Eテストフレームワーク
 - **[Google Gemini](https://ai.google.dev/)** - AIビジュアル分析エンジン
 - **[Rich](https://github.com/Textualize/rich)** - ターミナルUI美化
+
+## 更新履歴
+
+### v2.1 (2026-03-14)
+
+- **Pre-push Hook v3**: グローバル版とプロジェクト版を統合、動的ステップ数
+  - TypeScriptビルドチェック (vue-tsc / ng build / tsc)
+  - コミットメッセージ形式チェック（絵文字禁止）
+  - 絵文字スキャンをgit diffに変更（高速化）
+  - Python Ruff lint (check + format)
+  - エラー/警告の分離、ステップごとの計時
+- **品質チェック拡張**
+  - 中国大陸用語の禁止語 (56組、出典: pjchender/cn2tw4programmer)
+  - AI生成テキストパターン検出 (check_ai_slop)
+
+### v2.0 (2026-02)
+
+- OpenSpec仕様駆動開発 (SDD)
+- プロジェクト健全性スコアリング
+- コード統計ダッシュボード
+- 4種テストスイート (UIT/Smoke/E2E/UAT)
+- AIビジュアル分析 (Gemini)
+- UptimeRobot監視管理
+
+### v1.0 (2026-01)
+
+- プロジェクト検証 (dash validate)
+- 機密データスキャン (dash scan)
+- E2Eスモークテスト (agent-browser)
+- データベースマイグレーション (Alembic)
+- dbdiagram.ioチャート生成
 
 ## ライセンス
 

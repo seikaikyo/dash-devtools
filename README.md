@@ -1,4 +1,4 @@
-# DashAI DevTools v2.0
+# DashAI DevTools v2.1
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
@@ -195,8 +195,10 @@ npm install -D prisma-dbml-generator
 
 - 檔案行數限制 (500 行)
 - 命名規範 (kebab-case)
-- 禁止 Emoji (程式碼中)
+- 禁止 Emoji (程式碼和 commit message)
 - 禁止簡體字
+- 禁止中國用語 (56 組詞彙，如「視頻→影片」「內存→記憶體」)
+- AI 寫作痕跡偵測 (「值得注意的是」「至關重要」等)
 
 ## v2.0 新功能
 
@@ -504,30 +506,29 @@ dash doctor
 
 顯示：系統資訊、Python 路徑、套件版本、環境變數
 
-## Git Hooks
+## Git Hooks (Pre-push v3)
 
-安裝 pre-push hook 自動驗證：
+全域 pre-push hook，所有專案推送前自動檢查：
 
 ```bash
-# 基本安裝
-dash hooks install .
-
-# 嚴格模式：測試失敗會阻止推送
-dash hooks install . --strict
-
-# 啟用 E2E 煙霧測試
-dash hooks install . --e2e https://your-app.vercel.app
-
-# 嚴格 E2E 模式：E2E 失敗會阻止推送
-dash hooks install . --e2e https://your-app.vercel.app --strict-e2e
+# 安裝全域 hook
+git config --global core.hooksPath ~/.config/git/hooks
+cp scripts/pre-push ~/.config/git/hooks/pre-push
+chmod +x ~/.config/git/hooks/pre-push
 ```
 
-Push 前會自動執行：
-1. 檢查 Emoji
-2. 掃描機敏資料 (GitGuardian 或本地規則)
-3. 驗證專案規範
-4. 執行測試 (vitest/jest/pytest)
-5. E2E 煙霧測試 (如有設定)
+Push 前自動執行（依專案類型動態調整步驟數）：
+
+| 步驟 | 前端 | 後端 | 說明 |
+|------|:----:|:----:|------|
+| Emoji 掃描 | v | v | 只掃 git diff 變更檔 + commit message |
+| commit message 格式 | v | v | 禁止 Emoji，建議 `類型: 描述` 格式 |
+| 機敏資料掃描 | v | v | GitGuardian 或本地規則 |
+| TypeScript 建構 | v | - | vue-tsc / ng build / tsc（自動偵測） |
+| Python Ruff lint | - | v | check + format 檢查 |
+| 專案驗證 | v | v | dash validate（簡體字、AI 痕跡、品質） |
+
+錯誤阻擋推送，警告放行但顯示提示。每步驟附計時。
 
 ## 模板
 
@@ -749,24 +750,6 @@ cat file | claude -p "問題"    # 管道輸入
 
 ---
 
-## 專案清單
-
-| 專案 | 類型 | 說明 |
-|------|------|------|
-| MES 製造執行 | Angular + PrimeNG | 再生廠製造執行系統 |
-| SSO 管理後台 | Vite + Shoelace | 用戶與權限管理 |
-| EAP 設備自動化 | Vite + Shoelace | 設備自動化平台 |
-| VAC 承攬商門禁 | Vite + Shoelace | 承攬商門禁管理系統 |
-| RFID 追蹤 | Vite + Shoelace | RFID 標籤追蹤系統 |
-| MCS 物料控制 | Vite + Shoelace | 物料控制系統 |
-| MIDS 材料追蹤 | Vite + Shoelace | 材料識別與追蹤系統 |
-| GHG 碳排管理 | Vite + Shoelace | 溫室氣體排放管理系統 |
-| BPM 簽核流程 | Vite + Shoelace | 簽核流程管理系統 |
-| RMS 配方管理 | Vite + Shoelace | 配方管理系統 |
-| 8D 問題管理 | Vite + Shoelace | 8D 問題解決流程管理 |
-| Vision AI | Python | AI 影像辨識系統 |
-| API Center | Vite + Shoelace | API 管理中心與開發文件 |
-
 ## 開發
 
 ```bash
@@ -788,6 +771,37 @@ black .
 - **[Playwright](https://playwright.dev/)** - Microsoft 的 E2E 測試框架
 - **[Google Gemini](https://ai.google.dev/)** - AI 視覺分析引擎
 - **[Rich](https://github.com/Textualize/rich)** - 終端 UI 美化
+
+## 更新歷程
+
+### v2.1 (2026-03-14)
+
+- **Pre-push Hook v3**: 合併全域版與專案版，動態步驟數
+  - 新增 TypeScript 建構檢查 (vue-tsc / ng build / tsc)
+  - 新增 commit message 格式檢查（禁止 Emoji）
+  - Emoji 掃描改用 git diff（只查變更檔，速度提升）
+  - 新增 Python Ruff lint (check + format)
+  - 錯誤/警告分級，每步驟計時
+- **品質檢查擴充**
+  - 新增中國用語禁用詞 (56 組，來源: pjchender/cn2tw4programmer)
+  - 新增 AI 寫作痕跡偵測 (check_ai_slop)
+
+### v2.0 (2026-02)
+
+- OpenSpec 規格驅動開發 (SDD)
+- 專案健康評分
+- 程式碼統計儀表板
+- 四大測試套件 (UIT/Smoke/E2E/UAT)
+- AI 視覺分析 (Gemini)
+- UptimeRobot 監控管理
+
+### v1.0 (2026-01)
+
+- 專案驗證 (dash validate)
+- 機敏資料掃描 (dash scan)
+- E2E 煙霧測試 (agent-browser)
+- 資料庫遷移管理 (Alembic)
+- dbdiagram.io 圖表產生
 
 ## 授權
 

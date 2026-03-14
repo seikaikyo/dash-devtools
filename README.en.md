@@ -1,4 +1,4 @@
-# DashAI DevTools v2.0
+# DashAI DevTools v2.1
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
@@ -220,27 +220,29 @@ dash ai review .
 
 Requires: `export GEMINI_API_KEY="your-api-key"`
 
-## Git Hooks
+## Git Hooks (Pre-push v3)
 
-Install pre-push hook for automatic validation:
+Global pre-push hook that auto-checks before every push:
 
 ```bash
-# Basic install
-dash hooks install .
-
-# Strict mode: test failures block push
-dash hooks install . --strict
-
-# Enable E2E smoke testing
-dash hooks install . --e2e https://your-app.vercel.app
+# Install global hook
+git config --global core.hooksPath ~/.config/git/hooks
+cp scripts/pre-push ~/.config/git/hooks/pre-push
+chmod +x ~/.config/git/hooks/pre-push
 ```
 
-Pre-push automatically runs:
-1. Emoji check
-2. Sensitive data scan (GitGuardian or local rules)
-3. Project standards validation
-4. Tests (vitest/jest/pytest)
-5. E2E smoke test (if configured)
+Steps are dynamically adjusted by project type:
+
+| Step | Frontend | Backend | Description |
+|------|:--------:|:-------:|-------------|
+| Emoji scan | v | v | Only scans git diff changed files + commit messages |
+| Commit message format | v | v | Blocks emoji, suggests `type: description` format |
+| Secret scan | v | v | GitGuardian or local regex |
+| TypeScript build | v | - | vue-tsc / ng build / tsc (auto-detected) |
+| Python Ruff lint | - | v | check + format |
+| Project validation | v | v | dash validate (simplified Chinese, AI slop, quality) |
+
+Errors block the push; warnings pass with a notice. Each step shows elapsed time.
 
 ## Claude Code Integration
 
@@ -275,6 +277,37 @@ This project uses the following open-source tools:
 - **[Playwright](https://playwright.dev/)** - E2E testing framework by Microsoft
 - **[Google Gemini](https://ai.google.dev/)** - AI visual analysis engine
 - **[Rich](https://github.com/Textualize/rich)** - Terminal UI beautification
+
+## Changelog
+
+### v2.1 (2026-03-14)
+
+- **Pre-push Hook v3**: Merged global and project hooks, dynamic step count
+  - TypeScript build check (vue-tsc / ng build / tsc)
+  - Commit message format check (emoji blocked)
+  - Emoji scan uses git diff (faster, changed files only)
+  - Python Ruff lint (check + format)
+  - Error/warning separation, per-step timing
+- **Quality checks expanded**
+  - Banned China-specific terms (56 pairs, source: pjchender/cn2tw4programmer)
+  - AI writing pattern detection (check_ai_slop)
+
+### v2.0 (2026-02)
+
+- OpenSpec spec-driven development (SDD)
+- Project health scoring
+- Code statistics dashboard
+- Four-type test suite (UIT/Smoke/E2E/UAT)
+- AI visual analysis (Gemini)
+- UptimeRobot monitoring
+
+### v1.0 (2026-01)
+
+- Project validation (dash validate)
+- Secret scanning (dash scan)
+- E2E smoke testing (agent-browser)
+- Database migration (Alembic)
+- dbdiagram.io chart generation
 
 ## License
 
