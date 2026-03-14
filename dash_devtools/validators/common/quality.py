@@ -32,6 +32,19 @@ class QualityValidator:
         '请', '马', '车', '书', '学', '习', '写', '医', '药', '师'
     ]
 
+    # 中國用語禁用詞（應替換為台灣用語）
+    BANNED_CN_TERMS = {
+        '崗位': '職位',
+        '人才市場': '人力銀行',
+        '上線': '上架',  # 網站上架的場合
+        '博客': '部落格',
+        '視頻': '影片',
+        '軟件': '軟體',
+        '硬件': '硬體',
+        '信息': '資訊',
+        '網絡': '網路',
+    }
+
     # 忽略目錄
     IGNORE_DIRS = [
         'node_modules', '.git', 'dist', 'build', '.next', '__pycache__',
@@ -63,6 +76,7 @@ class QualityValidator:
 
         self.check_file_length()
         self.check_simplified_chinese()
+        self.check_banned_cn_terms()
         self.check_naming_conventions()
         self.check_emoji_usage()
 
@@ -143,6 +157,46 @@ class QualityValidator:
                     f"發現簡體字在 {issue['file']}: {', '.join(issue['chars'])}"
                 )
             self.result['passed'] = False
+
+    def check_banned_cn_terms(self):
+        """檢查中國用語禁用詞"""
+        if self.project_name in self.JAPANESE_PROJECTS:
+            return
+
+        issues = []
+
+        for file_path in self._get_source_files():
+            try:
+                rel_path = str(file_path.relative_to(self.project_path))
+
+                if self._is_pattern_ignored(rel_path, '中國用語'):
+                    continue
+
+                content = file_path.read_text(encoding='utf-8')
+                found_terms = []
+
+                for cn_term, tw_term in self.BANNED_CN_TERMS.items():
+                    if cn_term in content:
+                        found_terms.append(f"{cn_term}→{tw_term}")
+
+                if found_terms:
+                    issues.append({
+                        'file': rel_path,
+                        'terms': found_terms
+                    })
+            except Exception:
+                pass
+
+        self.result['checks']['banned_cn_terms'] = {
+            'count': len(issues),
+            'files': issues
+        }
+
+        if issues:
+            for issue in issues[:3]:
+                self.result['warnings'].append(
+                    f"發現中國用語在 {issue['file']}: {', '.join(issue['terms'])}"
+                )
 
     def check_naming_conventions(self):
         """檢查命名規範"""
