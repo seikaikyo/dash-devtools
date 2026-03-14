@@ -1,0 +1,7 @@
+# DashAI DevTools .scanignore
+# 排除 validator 自身的偵測詞庫（包含簡體字和中國用語作為比對用）
+
+[pattern:簡體字] dash_devtools/validators/code_quality.py
+[pattern:簡體字] dash_devtools/validators/common/quality.py
+[pattern:中國用語] dash_devtools/validators/common/quality.py
+[pattern:AI痕跡] dash_devtools/validators/common/quality.py
