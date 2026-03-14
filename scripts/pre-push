@@ -1,0 +1,274 @@
+#!/bin/bash
+# DashAI DevTools 全域 Pre-push Hook v3
+# 合併檢查: Emoji → commit message → 機敏資料 → 建構 → Lint → 驗證
+#
+# 安裝方式:
+#   git config --global core.hooksPath ~/.config/git/hooks
+#   cp scripts/pre-push ~/.config/git/hooks/pre-push
+#   chmod +x ~/.config/git/hooks/pre-push
+
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)"
+if [ -z "$PROJECT_ROOT" ]; then
+    exit 0
+fi
+
+# ── dash-devtools 指令偵測 ──
+# pyenv 路徑避免與 /bin/dash 衝突
+DASH_CMD="$HOME/.pyenv/versions/3.12.12/bin/dash"
+if [ ! -x "$DASH_CMD" ]; then
+    # fallback: 嘗試 PATH 中的 dash-devtools
+    DASH_CMD="$(which dash 2>/dev/null || true)"
+    if [ -z "$DASH_CMD" ] || [ "$DASH_CMD" = "/bin/dash" ]; then
+        echo "[!] dash-devtools 未安裝，跳過檢查"
+        exit 0
+    fi
+fi
+
+# ── 專案類型偵測 ──
+IS_FRONTEND=false
+IS_TYPESCRIPT=false
+IS_ANGULAR=false
+IS_VUE=false
+IS_PYTHON=false
+
+if [ -f "$PROJECT_ROOT/package.json" ]; then
+    IS_FRONTEND=true
+fi
+if [ -f "$PROJECT_ROOT/tsconfig.json" ]; then
+    IS_TYPESCRIPT=true
+fi
+if [ -f "$PROJECT_ROOT/angular.json" ]; then
+    IS_ANGULAR=true
+fi
+if [ -f "$PROJECT_ROOT/node_modules/.bin/vue-tsc" ]; then
+    IS_VUE=true
+fi
+if [ -f "$PROJECT_ROOT/requirements.txt" ] || [ -f "$PROJECT_ROOT/pyproject.toml" ]; then
+    IS_PYTHON=true
+fi
+
+# ── 步驟數計算 ──
+TOTAL_STEPS=3  # Emoji + commit msg + 機敏資料（固定）
+if [ "$IS_TYPESCRIPT" = true ]; then
+    TOTAL_STEPS=$((TOTAL_STEPS + 1))
+fi
+if [ "$IS_PYTHON" = true ]; then
+    TOTAL_STEPS=$((TOTAL_STEPS + 1))
+fi
+if [ "$IS_FRONTEND" = true ] || [ "$IS_PYTHON" = true ]; then
+    TOTAL_STEPS=$((TOTAL_STEPS + 1))  # dash validate
+fi
+
+CURRENT_STEP=0
+
+# ── 計時 ──
+HOOK_START=$(date +%s)
+step_time() {
+    echo "($(( $(date +%s) - HOOK_START ))s)"
+}
+
+# ── 失敗計數（警告不阻擋，錯誤阻擋）──
+ERRORS=0
+WARNINGS=0
+
+fail() {
+    ERRORS=$((ERRORS + 1))
+    echo "   $1"
+}
+
+warn() {
+    WARNINGS=$((WARNINGS + 1))
+    echo "   $1"
+}
+
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "[i] DashAI DevTools Pre-push v3"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+# ════════════════════════════════════════
+# 步驟 0: Emoji 檢查
+# ════════════════════════════════════════
+echo ""
+echo "[>] 步驟 $CURRENT_STEP/$TOTAL_STEPS: 檢查 Emoji..."
+
+# 取得要推送的變更檔案（比 find 全專案快）
+CHANGED_FILES=$(git diff --name-only --diff-filter=d @{push}..HEAD 2>/dev/null || \
+                git diff --name-only --diff-filter=d HEAD~1..HEAD 2>/dev/null || true)
+
+EMOJI_FOUND=false
+if [ -n "$CHANGED_FILES" ]; then
+    echo "$CHANGED_FILES" | grep -E '\.(js|ts|jsx|tsx|vue|html|css|py|md|json)$' | while read -r file; do
+        filepath="$PROJECT_ROOT/$file"
+        [ -f "$filepath" ] || continue
+        if grep -lP '[\x{1F300}-\x{1F9FF}\x{2600}-\x{27BF}\x{FE00}-\x{FE0F}\x{1F1E0}-\x{1F1FF}]' "$filepath" >/dev/null 2>&1; then
+            echo "   [x] $file"
+            echo "EMOJI_FAIL" >> /tmp/dash_hook_$$
+        fi
+    done
+fi
+
+if [ -f /tmp/dash_hook_$$ ]; then
+    rm -f /tmp/dash_hook_$$
+    echo ""
+    echo "[x] 請移除 emoji（使用 PrimeIcons 或 SVG 替代）"
+    ERRORS=$((ERRORS + 1))
+else
+    echo "[v] 無 Emoji $(step_time)"
+fi
+CURRENT_STEP=$((CURRENT_STEP + 1))
+
+# ════════════════════════════════════════
+# 步驟 1: Commit Message 格式檢查
+# ════════════════════════════════════════
+echo ""
+echo "[>] 步驟 $CURRENT_STEP/$TOTAL_STEPS: 檢查 commit message..."
+
+# 從 stdin 讀取推送範圍（git push 會提供）
+COMMIT_FAIL=false
+while read -r local_ref local_sha remote_ref remote_sha 2>/dev/null; do
+    [ -z "$local_sha" ] && continue
+
+    if [ "$remote_sha" = "0000000000000000000000000000000000000000" ]; then
+        RANGE="$local_sha"
+    else
+        RANGE="$remote_sha..$local_sha"
+    fi
+
+    git log --format="%h %s" "$RANGE" 2>/dev/null | while read -r hash subject; do
+        [ -z "$hash" ] && continue
+
+        # 禁止 Emoji
+        if echo "$subject" | grep -qP '[\x{1F300}-\x{1F9FF}\x{2600}-\x{27BF}]' 2>/dev/null; then
+            echo "   [x] $hash: commit message 含 Emoji"
+            echo "FAIL" >> /tmp/dash_commit_$$
+        fi
+
+        # 格式建議（不阻擋，僅提示）
+        if ! echo "$subject" | grep -qE '^(feat|fix|refactor|docs|chore|test|style|perf|ci|build|revert):' 2>/dev/null; then
+            if ! echo "$subject" | grep -qiE '^(Merge|Revert|Co-Authored)' 2>/dev/null; then
+                echo "   [!] $hash: 建議格式 'feat|fix|docs: 描述'"
+            fi
+        fi
+    done
+done
+
+if [ -f /tmp/dash_commit_$$ ]; then
+    rm -f /tmp/dash_commit_$$
+    echo "[x] commit message 含禁用字元！"
+    ERRORS=$((ERRORS + 1))
+else
+    echo "[v] commit message 正常 $(step_time)"
+fi
+CURRENT_STEP=$((CURRENT_STEP + 1))
+
+# ════════════════════════════════════════
+# 步驟 2: 機敏資料掃描
+# ════════════════════════════════════════
+echo ""
+echo "[>] 步驟 $CURRENT_STEP/$TOTAL_STEPS: 掃描機敏資料..."
+if ! "$DASH_CMD" scan "$PROJECT_ROOT"; then
+    echo "[x] 機敏資料檢查失敗！"
+    ERRORS=$((ERRORS + 1))
+fi
+echo "$(step_time)"
+CURRENT_STEP=$((CURRENT_STEP + 1))
+
+# ════════════════════════════════════════
+# 步驟 3: 建構檢查（TypeScript / Angular）
+# ════════════════════════════════════════
+if [ "$IS_TYPESCRIPT" = true ]; then
+    echo ""
+    echo "[>] 步驟 $CURRENT_STEP/$TOTAL_STEPS: 建構檢查..."
+
+    if [ "$IS_VUE" = true ]; then
+        echo "   [vue-tsc] 類型檢查..."
+        if ! (cd "$PROJECT_ROOT" && npx vue-tsc --noEmit 2>&1); then
+            fail "[x] vue-tsc 類型檢查失敗"
+        else
+            echo "[v] vue-tsc 通過 $(step_time)"
+        fi
+
+    elif [ "$IS_ANGULAR" = true ]; then
+        echo "   [ng] 建構檢查..."
+        if ! (cd "$PROJECT_ROOT" && npx ng build --configuration production 2>&1); then
+            fail "[x] Angular 建構失敗"
+        else
+            echo "[v] ng build 通過 $(step_time)"
+        fi
+
+    elif [ -f "$PROJECT_ROOT/node_modules/.bin/tsc" ]; then
+        echo "   [tsc] 類型檢查..."
+        if ! (cd "$PROJECT_ROOT" && npx tsc --noEmit 2>&1); then
+            fail "[x] tsc 類型檢查失敗"
+        else
+            echo "[v] tsc 通過 $(step_time)"
+        fi
+    fi
+    CURRENT_STEP=$((CURRENT_STEP + 1))
+fi
+
+# ════════════════════════════════════════
+# 步驟 N: Python Lint（Ruff）
+# ════════════════════════════════════════
+if [ "$IS_PYTHON" = true ]; then
+    echo ""
+    echo "[>] 步驟 $CURRENT_STEP/$TOTAL_STEPS: Python lint..."
+
+    if command -v ruff &> /dev/null; then
+        # Ruff check（語法錯誤和問題）
+        if ! ruff check "$PROJECT_ROOT" --quiet 2>/dev/null; then
+            warn "[!] Ruff 發現問題"
+        else
+            echo "[v] Ruff check 通過"
+        fi
+
+        # Ruff format（格式檢查，僅警告）
+        if ! ruff format --check "$PROJECT_ROOT" --quiet 2>/dev/null; then
+            warn "[!] 有檔案需要格式化 (ruff format)"
+        fi
+        echo "$(step_time)"
+    else
+        echo "   (Ruff 未安裝，跳過)"
+    fi
+    CURRENT_STEP=$((CURRENT_STEP + 1))
+fi
+
+# ════════════════════════════════════════
+# 步驟 N: 專案驗證 (dash validate)
+# ════════════════════════════════════════
+if [ "$IS_FRONTEND" = true ] || [ "$IS_PYTHON" = true ]; then
+    echo ""
+    echo "[>] 步驟 $CURRENT_STEP/$TOTAL_STEPS: 驗證專案..."
+
+    if ! "$DASH_CMD" validate "$PROJECT_ROOT"; then
+        fail "[x] 專案驗證失敗"
+    fi
+    echo "$(step_time)"
+    CURRENT_STEP=$((CURRENT_STEP + 1))
+fi
+
+# ════════════════════════════════════════
+# 結果彙整
+# ════════════════════════════════════════
+ELAPSED=$(( $(date +%s) - HOOK_START ))
+
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+if [ $ERRORS -gt 0 ]; then
+    echo "[x] 檢查失敗 ($ERRORS 項錯誤, $WARNINGS 項警告) (${ELAPSED}s)"
+    echo "   推送已取消，請修正後再試"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+    exit 1
+elif [ $WARNINGS -gt 0 ]; then
+    echo "[v] 檢查通過 ($WARNINGS 項警告) (${ELAPSED}s)"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+    exit 0
+else
+    echo "[v] 所有檢查通過 (${ELAPSED}s)"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+    exit 0
+fi
