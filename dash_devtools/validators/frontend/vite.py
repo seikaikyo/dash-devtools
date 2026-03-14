@@ -1,12 +1,12 @@
 """
-Vite 專案驗證器 v2.0
+Vite 專案驗證器 v2.1
 
 支援：
-- Vue 3 + Vite + DaisyUI (新架構)
+- Vue 3 + Vite + PrimeVue (標準架構)
 - Vite + Shoelace (舊架構，向下相容)
 
 檢查內容：
-1. DaisyUI/Tailwind 設定
+1. 禁用技術偵測 (DaisyUI/TailwindCSS)
 2. Vue SFC 語法檢查
 3. 禁止 Emoji 圖示
 4. HTML 標籤完整性
@@ -48,7 +48,7 @@ ICON_EMOJI_PATTERNS = [
 
 
 class ViteValidator:
-    """Vite 專案驗證器 (支援 Vue 3 + DaisyUI)"""
+    """Vite 專案驗證器 (支援 Vue 3 + PrimeVue)"""
 
     name = 'vite'
 
@@ -112,11 +112,10 @@ class ViteValidator:
             self.result['errors'].append(f'專案路徑不存在: {self.project_path}')
             return self.result
 
-        # 根據 UI 框架選擇驗證
-        if self.ui_framework == 'daisyui':
-            self.check_daisyui_setup()
-        elif self.ui_framework == 'shoelace':
-            self.check_shoelace_setup()
+        # 禁用技術偵測
+        self.check_banned_frameworks()
+
+        # Shoelace 也是禁用技術，check_banned_frameworks 已處理
 
         # Vue SFC 檢查
         if self.is_vue:
@@ -130,90 +129,39 @@ class ViteValidator:
 
         return self.result
 
-    def check_daisyui_setup(self):
-        """檢查 DaisyUI + Tailwind CSS v4 設定"""
+    def check_banned_frameworks(self):
+        """偵測禁用技術 (DaisyUI / TailwindCSS)"""
         pkg_path = self.project_path / 'package.json'
-        has_daisyui = False
-        has_tailwind = False
-        daisyui_version = None
-        tailwind_version = None
+        if not pkg_path.exists():
+            return
 
-        if pkg_path.exists():
-            try:
-                pkg = json.loads(pkg_path.read_text(encoding='utf-8'))
-                deps = {**pkg.get('dependencies', {}), **pkg.get('devDependencies', {})}
+        try:
+            pkg = json.loads(pkg_path.read_text(encoding='utf-8'))
+            deps = {**pkg.get('dependencies', {}), **pkg.get('devDependencies', {})}
+        except Exception:
+            return
 
-                has_daisyui = 'daisyui' in deps
-                has_tailwind = 'tailwindcss' in deps or '@tailwindcss/vite' in deps
+        banned = []
+        if 'daisyui' in deps:
+            banned.append(f"DaisyUI {deps.get('daisyui', '')}")
+        if 'tailwindcss' in deps or '@tailwindcss/vite' in deps:
+            ver = deps.get('tailwindcss') or deps.get('@tailwindcss/vite', '')
+            banned.append(f"TailwindCSS {ver}")
+        if '@shoelace-style/shoelace' in deps:
+            banned.append(f"Shoelace {deps.get('@shoelace-style/shoelace', '')}")
 
-                daisyui_version = deps.get('daisyui')
-                tailwind_version = deps.get('tailwindcss') or deps.get('@tailwindcss/vite')
-            except Exception:
-                pass
-
-        # 檢查 CSS 設定 (Tailwind v4 使用 @import/@plugin)
-        css_config_valid = False
-        css_file = self.src_path / 'style.css'
-        if not css_file.exists():
-            css_file = self.src_path / 'index.css'
-        if not css_file.exists():
-            css_file = self.src_path / 'main.css'
-
-        if css_file.exists():
-            try:
-                content = css_file.read_text(encoding='utf-8')
-                # Tailwind v4 語法
-                if '@import "tailwindcss"' in content or '@tailwind' in content:
-                    css_config_valid = True
-                if '@plugin "daisyui"' in content:
-                    css_config_valid = True
-            except Exception:
-                pass
-
-        # 檢查 vite.config.ts 是否有 tailwindcss plugin
-        vite_config = self.project_path / 'vite.config.ts'
-        vite_config_valid = False
-        if vite_config.exists():
-            try:
-                content = vite_config.read_text(encoding='utf-8')
-                if 'tailwindcss' in content or '@tailwindcss/vite' in content:
-                    vite_config_valid = True
-            except Exception:
-                pass
-
-        self.result['checks']['daisyui_setup'] = {
-            'has_daisyui': has_daisyui,
-            'has_tailwind': has_tailwind,
-            'daisyui_version': daisyui_version,
-            'tailwind_version': tailwind_version,
-            'css_config_valid': css_config_valid,
-            'vite_config_valid': vite_config_valid
+        self.result['checks']['banned_frameworks'] = {
+            'banned': banned
         }
 
-        if has_daisyui and not css_config_valid:
-            self.result['warnings'].append('DaisyUI 已安裝但 CSS 設定可能不完整')
-
-        if has_tailwind and not vite_config_valid:
-            self.result['warnings'].append('Tailwind 已安裝但 vite.config 可能缺少 plugin')
+        if banned:
+            self.result['warnings'].append(
+                f"偵測到禁用技術: {', '.join(banned)}。建議重構至 Vite + Vue 3 + PrimeVue"
+            )
 
     def check_shoelace_setup(self):
-        """檢查 Shoelace 設定 (向下相容)"""
-        index_html = self.project_path / 'index.html'
-        has_shoelace_css = False
-        has_shoelace_js = False
-
-        if index_html.exists():
-            try:
-                content = index_html.read_text(encoding='utf-8')
-                has_shoelace_css = 'shoelace' in content.lower() and '.css' in content
-                has_shoelace_js = 'shoelace' in content.lower() and '.js' in content
-            except Exception:
-                pass
-
-        self.result['checks']['shoelace_setup'] = {
-            'has_css': has_shoelace_css,
-            'has_js': has_shoelace_js
-        }
+        """已併入 check_banned_frameworks，保留方法避免引用錯誤"""
+        pass
 
     def check_vue_sfc(self):
         """檢查 Vue SFC 語法"""
