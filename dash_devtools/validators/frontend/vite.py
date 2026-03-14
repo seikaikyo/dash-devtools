@@ -1,12 +1,11 @@
 """
-Vite 專案驗證器 v2.1
+Vite 專案驗證器 v2.2
 
 支援：
 - Vue 3 + Vite + PrimeVue (標準架構)
-- Vite + Shoelace (舊架構，向下相容)
 
 檢查內容：
-1. 禁用技術偵測 (DaisyUI/TailwindCSS)
+1. 禁用技術偵測 (DaisyUI/TailwindCSS/Shoelace)
 2. Vue SFC 語法檢查
 3. 禁止 Emoji 圖示
 4. HTML 標籤完整性
@@ -84,8 +83,6 @@ class ViteValidator:
 
             if 'daisyui' in deps:
                 return 'daisyui'
-            if '@shoelace-style/shoelace' in deps:
-                return 'shoelace'
             if 'tailwindcss' in deps:
                 return 'tailwind'
         except Exception:
@@ -114,8 +111,6 @@ class ViteValidator:
 
         # 禁用技術偵測
         self.check_banned_frameworks()
-
-        # Shoelace 也是禁用技術，check_banned_frameworks 已處理
 
         # Vue SFC 檢查
         if self.is_vue:
@@ -158,10 +153,6 @@ class ViteValidator:
             self.result['warnings'].append(
                 f"偵測到禁用技術: {', '.join(banned)}。建議重構至 Vite + Vue 3 + PrimeVue"
             )
-
-    def check_shoelace_setup(self):
-        """已併入 check_banned_frameworks，保留方法避免引用錯誤"""
-        pass
 
     def check_vue_sfc(self):
         """檢查 Vue SFC 語法"""
@@ -316,7 +307,7 @@ class ViteValidator:
         }
 
         if total_count > 0:
-            icon_lib = 'lucide-vue-next' if self.is_vue else 'sl-icon'
+            icon_lib = 'PrimeIcons (pi pi-xxx)' if self.is_vue else 'PrimeIcons'
             self.result['warnings'].append(
                 f'Emoji 圖示: {total_count} 個（應改用 {icon_lib}）'
             )
@@ -386,7 +377,6 @@ class ViteValidator:
 
         patterns = [
             r'<button[^>]*>\s*\n?\s*</button>',
-            r'<sl-button[^>]*>\s*\n?\s*</sl-button>'
         ]
         issues = []
 

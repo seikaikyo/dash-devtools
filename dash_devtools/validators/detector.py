@@ -102,8 +102,6 @@ class ProjectDetector:
                 ui_framework = None
                 if 'daisyui' in deps:
                     ui_framework = 'daisyui'
-                elif '@shoelace-style/shoelace' in deps:
-                    ui_framework = 'shoelace'
 
                 return {
                     'type': 'vue-vite' if 'vite' in deps else 'vue',
@@ -118,8 +116,6 @@ class ProjectDetector:
                 ui_framework = None
                 if 'daisyui' in deps:
                     ui_framework = 'daisyui'
-                elif '@shoelace-style/shoelace' in deps:
-                    ui_framework = 'shoelace'
 
                 return {
                     'type': 'vite',
@@ -171,10 +167,7 @@ class ProjectDetector:
 
             for html_file in html_files:
                 content = html_file.read_text(encoding='utf-8')
-                if 'shoelace' in content.lower() or 'sl-' in content:
-                    ui_framework = 'shoelace'
-                    break
-                elif 'daisyui' in content.lower():
+                if 'daisyui' in content.lower():
                     ui_framework = 'daisyui'
                     break
 

@@ -1,21 +1,21 @@
 """
 遷移工具集
 
-注意：Shoelace → DaisyUI 遷移器已棄用
-目前維持 Shoelace 作為非 Angular 專案的標準 UI 框架
+注意：UI 框架遷移功能已棄用
+- Shoelace / DaisyUI 均已從標準技術棧移除
+- 標準前端方案：Vite + Vue 3 + PrimeVue / Angular + PrimeNG
 """
 
 __all__ = ['run_migration']
 
 
-def run_migration(project, dry_run=False, from_framework='shoelace', to_framework='daisyui'):
+def run_migration(project, dry_run=False, from_framework=None, to_framework=None):
     """執行遷移
 
-    注意：此功能已暫停使用
-    - Shoelace 維持為標準 UI 框架
-    - 遷移需要完整理解設計邏輯後才能進行
+    注意：此功能已棄用。
+    標準前端方案為 Vite + Vue 3 + PrimeVue 或 Angular + PrimeNG。
     """
     return {
         'success': False,
-        'error': '遷移功能已暫停。UI 框架遷移需要完整理解設計邏輯後手動進行。'
+        'error': '遷移功能已棄用。標準前端方案為 Vite + Vue 3 + PrimeVue 或 Angular + PrimeNG。'
     }

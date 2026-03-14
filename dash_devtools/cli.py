@@ -124,32 +124,26 @@ def validate(project, validate_all, check, fix, output):
     if not fix and (failed or has_warnings):
         console.print("\n[yellow]━━━ 修復提示 ━━━[/yellow]")
         console.print("[yellow]  dash validate <專案路徑> --fix[/yellow]")
-        console.print("[dim]  自動修復：HTML 標籤修復、sl-icon-button label 屬性等[/dim]")
+        console.print("[dim]  自動修復：HTML 標籤修復、空白事件處理器等[/dim]")
 
 
 @main.command()
 @click.argument('project', type=click.Path())
 @click.option('--dry-run', is_flag=True, help='預覽模式，不實際修改')
-@click.option('--from', 'from_framework', default='shoelace', help='來源框架')
-@click.option('--to', 'to_framework', default='daisyui', help='目標框架')
+@click.option('--from', 'from_framework', default=None, help='來源框架（已棄用）')
+@click.option('--to', 'to_framework', default=None, help='目標框架（已棄用）')
 def migrate(project, dry_run, from_framework, to_framework):
-    """遷移 UI 框架"""
+    """遷移 UI 框架（已棄用）"""
     from .migrators import run_migration
 
-    console.print(f"[cyan]遷移專案: {project}[/cyan]")
-    console.print(f"[cyan]{from_framework} → {to_framework}[/cyan]")
-
-    if dry_run:
-        console.print("[yellow]預覽模式 - 不會實際修改檔案[/yellow]")
+    console.print("[yellow]UI 框架遷移功能已棄用。[/yellow]")
+    console.print("[dim]標準前端方案為 Vite + Vue 3 + PrimeVue 或 Angular + PrimeNG。[/dim]")
 
     result = run_migration(project, dry_run=dry_run,
                           from_framework=from_framework,
                           to_framework=to_framework)
 
-    if result['success']:
-        console.print("[green]遷移完成！[/green]")
-    else:
-        console.print(f"[red]遷移失敗: {result.get('error')}[/red]")
+    console.print(f"[red]{result.get('error')}[/red]")
 
 
 @main.group()

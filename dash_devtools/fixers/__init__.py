@@ -3,7 +3,7 @@
 
 修復器：
 - MigrationFixer: HTML 標籤、事件處理器
-- UxFixer: UI/UX 問題（下拉選單、按鈕 title、卡片邊框）
+- UxFixer: UI/UX 問題（預留介面）
 - VersionBumper: 版本號自動更新
 """
 

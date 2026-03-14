@@ -2,9 +2,9 @@
 前端驗證器
 
 支援框架：
-- Vite + Tailwind + DaisyUI
+- Vite + Vue 3 + PrimeVue
 - Angular + PrimeNG
-- GAS (Google Apps Script) + Vue 3 + Shoelace/DaisyUI
+- GAS (Google Apps Script) + Vue 3
 """
 
 from .vite import ViteValidator

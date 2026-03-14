@@ -4,9 +4,9 @@
 新架構：依專案類型自動選擇驗證器
 
 - common: 通用驗證（安全、品質）- 所有專案
-- frontend/vite: Vite + Shoelace
+- frontend/vite: Vite + Vue 3 + PrimeVue
 - frontend/angular: Angular + PrimeNG
-- frontend/gas: GAS (Google Apps Script) + Vue 3 + Shoelace/DaisyUI
+- frontend/gas: GAS (Google Apps Script) + Vue 3
 - backend/nodejs: Node.js API
 - backend/python: Python 後端/AI
 """

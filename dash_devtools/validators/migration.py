@@ -2,45 +2,45 @@
 UI 框架驗證器
 
 檢查內容：
-1. Shoelace 元件正確使用
-2. 禁止使用 Emoji 作為圖示（應用 sl-icon）
-3. 重複 class 屬性
-4. Shoelace CSS 變數正確使用
-5. 不完整 HTML 標籤
+1. 禁止使用 Emoji 作為圖示（應用 PrimeIcons）
+2. 重複 class 屬性
+3. 不完整 HTML 標籤
+4. 空白按鈕
+5. 空白事件處理器
 """
 
 import re
 from pathlib import Path
 
 
-# 常見 Emoji 圖示（這些應該用 sl-icon 取代）
+# 常見 Emoji 圖示（這些應該用 PrimeIcons 取代）
 ICON_EMOJI_PATTERNS = [
     # 工具與操作
-    r'[\U0001F527\U0001F528\U0001F529]',  # 🔧🔨🔩 wrench/hammer
-    r'[\U0001F504\U0001F503]',  # 🔄🔃 refresh
-    r'[\U0001F50D\U0001F50E]',  # 🔍🔎 search
-    r'[\u2699\uFE0F]?',  # ⚙️ gear
-    r'[\U0001F5D1\uFE0F]?',  # 🗑️ trash
-    r'[\u270F\uFE0F]?',  # ✏️ pencil
-    r'[\u2795]',  # ➕ plus
-    r'[\u2796]',  # ➖ minus
+    r'[\U0001F527\U0001F528\U0001F529]',  # wrench/hammer
+    r'[\U0001F504\U0001F503]',  # refresh
+    r'[\U0001F50D\U0001F50E]',  # search
+    r'[\u2699\uFE0F]?',  # gear
+    r'[\U0001F5D1\uFE0F]?',  # trash
+    r'[\u270F\uFE0F]?',  # pencil
+    r'[\u2795]',  # plus
+    r'[\u2796]',  # minus
     # 狀態指示
-    r'[\u2705]',  # ✅ check mark
-    r'[\u274C]',  # ❌ cross mark
-    r'[\u26A0\uFE0F]?',  # ⚠️ warning
-    r'[\U0001F6A8]',  # 🚨 alert
-    r'[\u2139\uFE0F]?',  # ℹ️ info
+    r'[\u2705]',  # check mark
+    r'[\u274C]',  # cross mark
+    r'[\u26A0\uFE0F]?',  # warning
+    r'[\U0001F6A8]',  # alert
+    r'[\u2139\uFE0F]?',  # info
     # 物件與符號
-    r'[\U0001F3E2]',  # 🏢 building
-    r'[\U0001F4CB]',  # 📋 clipboard
-    r'[\U0001F4C5\U0001F4C6]',  # 📅📆 calendar
-    r'[\U0001F464\U0001F465]',  # 👤👥 person/people
-    r'[\U0001F512\U0001F513]',  # 🔒🔓 lock
-    r'[\U0001F510]',  # 🔐 key lock
-    r'[\u231B]',  # ⏳ hourglass
-    r'[\u23F3]',  # ⏳ hourglass flowing
-    # 數字圓圈（應用 sl-icon 的 1-circle 等）
-    r'[1-9]\uFE0F?\u20E3',  # 1️⃣ 2️⃣ etc
+    r'[\U0001F3E2]',  # building
+    r'[\U0001F4CB]',  # clipboard
+    r'[\U0001F4C5\U0001F4C6]',  # calendar
+    r'[\U0001F464\U0001F465]',  # person/people
+    r'[\U0001F512\U0001F513]',  # lock
+    r'[\U0001F510]',  # key lock
+    r'[\u231B]',  # hourglass
+    r'[\u23F3]',  # hourglass flowing
+    # 數字圓圈
+    r'[1-9]\uFE0F?\u20E3',  # 1-circle etc
 ]
 
 
@@ -73,15 +73,12 @@ class MigrationValidator:
         has_primevue = self._has_primevue()
 
         if is_angular:
-            # Angular 專案使用 PrimeNG，跳過 Shoelace 檢查
             self.result['checks']['framework'] = 'Angular + PrimeNG'
         elif has_primevue:
-            # PrimeVue 專案，跳過 Shoelace 檢查
             self.result['checks']['framework'] = 'Vue 3 + PrimeVue'
-        else:
-            # 非 Angular/PrimeVue 專案應使用 Shoelace
-            self.check_shoelace_usage()
-            self.check_emoji_icons()
+
+        # Emoji 圖示檢查（所有專案適用）
+        self.check_emoji_icons()
 
         # 通用檢查
         self.check_duplicate_classes()
@@ -102,38 +99,8 @@ class MigrationValidator:
         except Exception:
             return False
 
-    def check_shoelace_usage(self):
-        """檢查 Shoelace 是否正確使用"""
-        # 檢查 index.html 是否有 Shoelace CDN
-        index_html = self.project_path / 'index.html'
-        has_shoelace_css = False
-        has_shoelace_js = False
-
-        if index_html.exists():
-            content = index_html.read_text(encoding='utf-8')
-            has_shoelace_css = 'shoelace' in content and '.css' in content
-            has_shoelace_js = 'shoelace' in content and '.js' in content
-
-        # 檢查 package.json
-        pkg_path = self.project_path / 'package.json'
-        has_shoelace_dep = False
-
-        if pkg_path.exists():
-            content = pkg_path.read_text(encoding='utf-8')
-            has_shoelace_dep = '@shoelace-style/shoelace' in content
-
-        self.result['checks']['shoelace_usage'] = {
-            'has_css': has_shoelace_css,
-            'has_js': has_shoelace_js,
-            'has_dependency': has_shoelace_dep
-        }
-
-        # Shoelace 是預期的框架，缺少才是問題
-        if not has_shoelace_css and not has_shoelace_dep:
-            self.result['warnings'].append('未偵測到 Shoelace（非 Angular 專案建議使用）')
-
     def check_emoji_icons(self):
-        """檢查 Emoji 圖示（應用 sl-icon 取代）"""
+        """檢查 Emoji 圖示（應用 PrimeIcons 取代）"""
         if not self.src_path.exists():
             return
 
@@ -143,7 +110,7 @@ class MigrationValidator:
         # 合併所有 emoji 模式
         combined_pattern = '|'.join(ICON_EMOJI_PATTERNS)
 
-        for ext in ['*.js', '*.html']:
+        for ext in ['*.js', '*.html', '*.vue', '*.ts']:
             for file_path in self.src_path.rglob(ext):
                 try:
                     content = file_path.read_text(encoding='utf-8')
@@ -166,14 +133,16 @@ class MigrationValidator:
 
         if total_count > 0:
             self.result['warnings'].append(
-                f'Emoji 圖示: {total_count} 個（建議改用 sl-icon）'
+                f'Emoji 圖示: {total_count} 個（建議改用 PrimeIcons）'
             )
 
     def _extract_template_strings(self, content):
         """提取 HTML 樣板字串內容"""
         # 匹配 `...` 樣板字串
         template_matches = re.findall(r'`[^`]*`', content, re.DOTALL)
-        return '\n'.join(template_matches)
+        # Vue template
+        vue_template = re.findall(r'<template[^>]*>([\s\S]*?)</template>', content)
+        return '\n'.join(template_matches + vue_template)
 
     def check_duplicate_classes(self):
         """檢查重複 class 屬性"""

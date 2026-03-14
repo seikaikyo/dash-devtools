@@ -1,16 +1,11 @@
 """
-Google Apps Script (GAS) 專案驗證器 v1.1
-
-支援 UI 框架：
-- DaisyUI + Vue 3 CDN（主要）
-- Shoelace（向下相容）
+Google Apps Script (GAS) 專案驗證器 v1.2
 
 檢查內容：
 1. appsscript.json 設定
 2. Code.js 版本號管理
 3. HTML 模板品質（v-for :key、標籤閉合）
-4. DaisyUI 主題設定
-5. Shoelace 綁定語法（僅限 Shoelace 專案）
+4. DaisyUI 主題設定（舊專案）
 """
 
 import re
@@ -42,11 +37,8 @@ class GasValidator:
         for html_file in self.project_path.glob('*.html'):
             try:
                 content = html_file.read_text(encoding='utf-8')
-                # DaisyUI 優先檢測（更常見）
                 if 'daisyui' in content.lower():
                     return 'daisyui'
-                elif 'shoelace' in content.lower() or 'sl-' in content:
-                    return 'shoelace'
             except Exception:
                 pass
         return None
@@ -75,10 +67,6 @@ class GasValidator:
         # UI 框架特定檢查
         if self.ui_framework == 'daisyui':
             self.check_daisyui_setup()
-        elif self.ui_framework == 'shoelace':
-            self.check_shoelace_binding()
-            if self.has_vue:
-                self.check_vue_custom_element()
 
         # Code.js 版本檢查
         self.check_version_management()
@@ -143,85 +131,6 @@ class GasValidator:
             self.result['warnings'].append(
                 'DaisyUI 未設定 data-theme，建議在 <html> 加入：\n'
                 '  <html data-theme="light">'
-            )
-
-    def check_shoelace_binding(self):
-        """檢查 Shoelace 元件綁定語法（僅限 Shoelace 專案）"""
-        issues = []
-
-        # 錯誤的 v-model 使用模式
-        wrong_patterns = [
-            (r'<sl-input[^>]*v-model\s*=\s*["\'][^"\']+["\']', 'sl-input'),
-            (r'<sl-select[^>]*v-model\s*=\s*["\'][^"\']+["\']', 'sl-select'),
-            (r'<sl-checkbox[^>]*v-model\s*=\s*["\'][^"\']+["\']', 'sl-checkbox'),
-            (r'<sl-textarea[^>]*v-model\s*=\s*["\'][^"\']+["\']', 'sl-textarea'),
-            (r'<sl-radio-group[^>]*v-model\s*=\s*["\'][^"\']+["\']', 'sl-radio-group'),
-        ]
-
-        for html_file in self.project_path.glob('*.html'):
-            try:
-                content = html_file.read_text(encoding='utf-8')
-                rel_path = html_file.name
-
-                for pattern, component in wrong_patterns:
-                    matches = re.findall(pattern, content, re.IGNORECASE)
-                    if matches:
-                        issues.append({
-                            'file': rel_path,
-                            'component': component,
-                            'count': len(matches)
-                        })
-
-            except Exception:
-                pass
-
-        self.result['checks']['shoelace_binding'] = {
-            'issues_count': len(issues),
-            'issues': issues
-        }
-
-        if issues:
-            self.result['passed'] = False
-            for issue in issues:
-                self.result['errors'].append(
-                    f"Shoelace 綁定錯誤: {issue['file']} - {issue['component']} 使用 v-model（應改用 :value + @sl-input）"
-                )
-
-            self.result['warnings'].append(
-                '正確寫法範例：\n'
-                '  <sl-input :value="formData.name" @sl-input="e => formData.name = e.target.value"></sl-input>\n'
-                '  <sl-select :value="formData.type" @sl-change="e => formData.type = e.target.value"></sl-select>'
-            )
-
-    def check_vue_custom_element(self):
-        """檢查 Vue isCustomElement 設定（僅限 Shoelace 專案）"""
-        has_config = False
-        config_location = None
-
-        for html_file in self.project_path.glob('*.html'):
-            try:
-                content = html_file.read_text(encoding='utf-8')
-
-                if 'isCustomElement' in content:
-                    has_config = True
-                    config_location = html_file.name
-
-                    if "tag.startsWith('sl-')" in content or "tag.startsWith(\"sl-\")" in content:
-                        break
-
-            except Exception:
-                pass
-
-        self.result['checks']['vue_custom_element'] = {
-            'has_config': has_config,
-            'config_location': config_location
-        }
-
-        if not has_config:
-            self.result['warnings'].append(
-                'Vue 未設定 isCustomElement，可能導致 Shoelace 元件警告\n'
-                '  建議在 Vue 初始化時加入：\n'
-                "  app.config.compilerOptions.isCustomElement = tag => tag.startsWith('sl-');"
             )
 
     def check_version_management(self):
