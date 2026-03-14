@@ -1,7 +1,7 @@
 """
 UI/UX 自動修復器
 
-修復項目：
+修復內容：
 1. 圖示按鈕加入 title 屬性 (Shoelace sl-icon-button)
 2. 空白按鈕警告
 

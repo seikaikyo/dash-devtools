@@ -102,7 +102,7 @@ def generate_markdown_report(
     lines.append("")
 
     # 摘要表格
-    lines.append("| 項目 | 數值 |")
+    lines.append("| 檢查項 | 數值 |")
     lines.append("|------|------|")
     lines.append(f"| 總測試數 | {total_passed + total_failed} |")
     lines.append(f"| 通過 | {total_passed} |")

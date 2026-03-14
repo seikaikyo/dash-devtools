@@ -109,7 +109,7 @@ class AgentBrowser:
         return self._run(*args, timeout=timeout)
 
     def back(self) -> BrowserResult:
-        """返回上一頁"""
+        """回到上一頁"""
         return self._run('back')
 
     def forward(self) -> BrowserResult:

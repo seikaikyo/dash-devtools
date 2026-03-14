@@ -35,7 +35,7 @@ try {
 
   const report = JSON.parse(result);
 
-  // 擷取關鍵數據
+  // 擷取關鍵資料
   const output = {
     url: url,
     success: true,
@@ -57,7 +57,7 @@ try {
     diagnostics: []
   };
 
-  // 擷取改善建議 (有節省時間的項目)
+  // 擷取改善建議 (有節省時間的檢查項)
   for (const [id, audit] of Object.entries(report.audits)) {
     if (audit.details?.overallSavingsMs > 100) {
       output.opportunities.push({

@@ -1,7 +1,7 @@
 """
 OpenSpec 規格驗證器
 
-檢查項目：
+檢查內容：
 1. openspec/ 目錄存在性
 2. 規格檔案格式正確 (YAML frontmatter)
 3. 無孤立的提案（超過 7 天未處理）
@@ -250,7 +250,7 @@ class SpecValidator:
             content: Markdown 檔案內容
 
         Returns:
-            dict: frontmatter 資料，如果沒有則返回 None
+            dict: frontmatter 資料，如果沒有則回傳 None
         """
         # 檢查是否以 --- 開頭
         if not content.startswith('---'):

@@ -139,7 +139,7 @@ class FileWatcher:
             # 檢查 TODO/FIXME
             for i, line in enumerate(lines, 1):
                 if 'TODO' in line or 'FIXME' in line:
-                    warnings.append(f'第 {i} 行: 有待處理項目')
+                    warnings.append(f'第 {i} 行: 有待處理事項')
 
             # 檢查 Emoji（禁止在程式碼中使用）
             import re

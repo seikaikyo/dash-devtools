@@ -58,7 +58,7 @@ def main():
 @click.argument('project', type=click.Path(), required=False)
 @click.option('--all', 'validate_all', is_flag=True, help='驗證所有專案')
 @click.option('--check', type=click.Choice(['security', 'migration', 'performance', 'code_quality', 'all', 'smart']),
-              default='smart', help='指定檢查項目 (smart=自動偵測專案類型)')
+              default='smart', help='指定檢查類別 (smart=自動偵測專案類型)')
 @click.option('--fix', is_flag=True, help='自動修復發現的問題')
 @click.option('--output', '-o', type=click.Path(), help='輸出報告路徑')
 def validate(project, validate_all, check, fix, output):
@@ -292,7 +292,7 @@ def install(project, strict, e2e, strict_e2e, mobile_e2e):
         console.print("[green]Git Hooks 已安裝[/green]")
         console.print("  已安裝：pre-commit, pre-push")
         console.print()
-        console.print("  [dim]Pre-push 檢查項目：[/dim]")
+        console.print("  [dim]Pre-push 檢查內容：[/dim]")
         console.print("    1. 檢查 Emoji")
         console.print("    2. 掃描機敏資料")
         console.print("    3. 驗證專案規範")

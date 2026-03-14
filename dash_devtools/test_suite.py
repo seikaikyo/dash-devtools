@@ -154,7 +154,7 @@ class TestSuiteRunner:
                     if json_match:
                         json_data = json.loads(json_match.group(1))
 
-                        # 從 JSON 提取統計數據
+                        # 從 JSON 提取統計資料
                         result.passed = json_data.get('numPassedTests', 0)
                         result.failed = json_data.get('numFailedTests', 0)
                         num_total = json_data.get('numTotalTests', 0)

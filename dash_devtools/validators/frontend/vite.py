@@ -5,7 +5,7 @@ Vite 專案驗證器 v2.0
 - Vue 3 + Vite + DaisyUI (新架構)
 - Vite + Shoelace (舊架構，向下相容)
 
-檢查項目：
+檢查內容：
 1. DaisyUI/Tailwind 設定
 2. Vue SFC 語法檢查
 3. 禁止 Emoji 圖示
@@ -151,7 +151,7 @@ class ViteValidator:
             except Exception:
                 pass
 
-        # 檢查 CSS 配置 (Tailwind v4 使用 @import/@plugin)
+        # 檢查 CSS 設定 (Tailwind v4 使用 @import/@plugin)
         css_config_valid = False
         css_file = self.src_path / 'style.css'
         if not css_file.exists():
@@ -191,7 +191,7 @@ class ViteValidator:
         }
 
         if has_daisyui and not css_config_valid:
-            self.result['warnings'].append('DaisyUI 已安裝但 CSS 配置可能不完整')
+            self.result['warnings'].append('DaisyUI 已安裝但 CSS 設定可能不完整')
 
         if has_tailwind and not vite_config_valid:
             self.result['warnings'].append('Tailwind 已安裝但 vite.config 可能缺少 plugin')
@@ -246,7 +246,7 @@ class ViteValidator:
                     for import_group in imports:
                         items = [i.strip() for i in import_group.split(',')]
                         for item in items:
-                            # 簡單檢查：import 的項目是否在 template 中使用
+                            # 簡單檢查：import 的元件是否在 template 中使用
                             clean_item = item.split(' as ')[-1].strip()
                             template_match = re.search(r'<template[^>]*>([\s\S]*)</template>', content)
                             if template_match:

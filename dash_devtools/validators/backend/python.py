@@ -6,7 +6,7 @@ Python 後端驗證器 v2.0
 - Ruff 整合 (lint + format)
 - 程式碼風格檢查
 
-檢查項目：
+檢查內容：
 1. FastAPI 結構 (main.py, routers/, etc.)
 2. Ruff lint/format 檢查
 3. 依賴管理 (requirements.txt / pyproject.toml)

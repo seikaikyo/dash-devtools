@@ -1,7 +1,7 @@
 """
 Angular 專案驗證器
 
-檢查項目：
+檢查內容：
 1. PrimeNG 設定
 2. 組件結構
 3. Service 注入

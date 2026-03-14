@@ -5,7 +5,7 @@ Google Apps Script (GAS) 專案驗證器 v1.1
 - DaisyUI + Vue 3 CDN（主要）
 - Shoelace（向下相容）
 
-檢查項目：
+檢查內容：
 1. appsscript.json 設定
 2. Code.js 版本號管理
 3. HTML 模板品質（v-for :key、標籤閉合）
