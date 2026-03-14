@@ -91,6 +91,24 @@ class QualityValidator:
         '登陸': '登入',
     }
 
+    # AI 寫作痕跡禁用詞（基於 humanizer-zh-tw skill）
+    # 出現在 i18n 字串、註解、文件中時警告
+    AI_SLOP_PHRASES = [
+        # 連接詞/填充短語
+        '值得注意的是', '為了實現這一目標', '在這個時間點',
+        '希望這對您有幫助', '請告訴我', '您說得完全正確',
+        # 誇大/宣傳語
+        '至關重要', '關鍵性的', '深入探討', '充滿活力',
+        '開創性的', '令人讚嘆的', '不可磨滅的',
+        '必遊之地', '激動人心',
+        # 模糊歸因
+        '專家認為', '業界報告顯示', '觀察者指出',
+        # 否定式排比
+        '不僅僅是', '這不僅是',
+        # 諂媚語
+        '好問題', '很好的觀點',
+    ]
+
     # 忽略目錄
     IGNORE_DIRS = [
         'node_modules', '.git', 'dist', 'build', '.next', '__pycache__',
@@ -123,6 +141,7 @@ class QualityValidator:
         self.check_file_length()
         self.check_simplified_chinese()
         self.check_banned_cn_terms()
+        self.check_ai_slop()
         self.check_naming_conventions()
         self.check_emoji_usage()
 
@@ -242,6 +261,43 @@ class QualityValidator:
             for issue in issues[:3]:
                 self.result['warnings'].append(
                     f"發現中國用語在 {issue['file']}: {', '.join(issue['terms'])}"
+                )
+
+    def check_ai_slop(self):
+        """檢查 AI 寫作痕跡"""
+        issues = []
+
+        for file_path in self._get_source_files():
+            try:
+                rel_path = str(file_path.relative_to(self.project_path))
+
+                if self._is_pattern_ignored(rel_path, 'AI痕跡'):
+                    continue
+
+                content = file_path.read_text(encoding='utf-8')
+                found = []
+
+                for phrase in self.AI_SLOP_PHRASES:
+                    if phrase in content:
+                        found.append(phrase)
+
+                if found:
+                    issues.append({
+                        'file': rel_path,
+                        'phrases': found[:5]
+                    })
+            except Exception:
+                pass
+
+        self.result['checks']['ai_slop'] = {
+            'count': len(issues),
+            'files': issues
+        }
+
+        if issues:
+            for issue in issues[:3]:
+                self.result['warnings'].append(
+                    f"發現 AI 寫作痕跡在 {issue['file']}: {', '.join(issue['phrases'])}"
                 )
 
     def check_naming_conventions(self):
