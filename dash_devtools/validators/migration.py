@@ -70,12 +70,16 @@ class MigrationValidator:
 
         # 判斷專案類型
         is_angular = (self.project_path / 'angular.json').exists()
+        has_primevue = self._has_primevue()
 
         if is_angular:
             # Angular 專案使用 PrimeNG，跳過 Shoelace 檢查
             self.result['checks']['framework'] = 'Angular + PrimeNG'
+        elif has_primevue:
+            # PrimeVue 專案，跳過 Shoelace 檢查
+            self.result['checks']['framework'] = 'Vue 3 + PrimeVue'
         else:
-            # 非 Angular 專案應使用 Shoelace
+            # 非 Angular/PrimeVue 專案應使用 Shoelace
             self.check_shoelace_usage()
             self.check_emoji_icons()
 
@@ -86,6 +90,17 @@ class MigrationValidator:
         self.check_empty_event_handlers()
 
         return self.result
+
+    def _has_primevue(self):
+        """檢查是否為 PrimeVue 專案"""
+        pkg_path = self.project_path / 'package.json'
+        if not pkg_path.exists():
+            return False
+        try:
+            content = pkg_path.read_text(encoding='utf-8')
+            return 'primevue' in content
+        except Exception:
+            return False
 
     def check_shoelace_usage(self):
         """檢查 Shoelace 是否正確使用"""

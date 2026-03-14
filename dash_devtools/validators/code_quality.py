@@ -70,6 +70,10 @@ class CodeQualityValidator:
         large_files = []
 
         for file_path in self._get_source_files():
+            # 跳過 i18n locale 檔案（翻譯檔天生就長）
+            if self._is_locale_file(file_path):
+                continue
+
             try:
                 content = file_path.read_text(encoding='utf-8')
                 line_count = len(content.splitlines())
@@ -107,6 +111,10 @@ class CodeQualityValidator:
         issues = []
 
         for file_path in self._get_source_files():
+            # 跳過日文相關檔案（日文漢字與簡體字共用字形）
+            if self._is_japanese_file(file_path):
+                continue
+
             try:
                 content = file_path.read_text(encoding='utf-8')
                 found_chars = []
@@ -140,6 +148,10 @@ class CodeQualityValidator:
         issues = []
 
         for file_path in self._get_source_files():
+            # 跳過 config 檔和 locale 檔
+            if self._is_config_file(file_path) or self._is_locale_file(file_path):
+                continue
+
             # 檢查檔案名稱
             name = file_path.stem
 
@@ -186,6 +198,37 @@ class CodeQualityValidator:
         if re.match(r'^[a-z][a-zA-Z0-9]*$', name):
             return True
         return False
+
+    def _is_japanese_file(self, file_path):
+        """判斷是否為日文相關檔案（檔名含 ja 或路徑含 locales/ja）"""
+        rel_path = str(file_path.relative_to(self.project_path))
+        # locales/ja.ts, locales/ja.json 等
+        if '/locales/ja.' in rel_path or rel_path.startswith('locales/ja.'):
+            return True
+        # 檔名含 ja 且路徑含 locales
+        if 'locales/' in rel_path and '/ja.' in rel_path:
+            return True
+        # i18n 相關檔案中包含日文內容（如 ics-i18n.ts）
+        if 'i18n' in file_path.stem and file_path.suffix in ['.ts', '.js']:
+            return True
+        return False
+
+    def _is_config_file(self, file_path):
+        """判斷是否為設定檔"""
+        config_patterns = [
+            'vite.config', 'tailwind.config', 'postcss.config',
+            'eslint.config', 'prettier.config', 'jest.config',
+            'webpack.config', 'rollup.config', 'tsconfig',
+            'karma.conf', 'playwright.config', 'vitest.config',
+            'babel.config', 'nuxt.config', 'next.config',
+            'cypress.config',
+        ]
+        return any(file_path.stem.startswith(p) for p in config_patterns)
+
+    def _is_locale_file(self, file_path):
+        """判斷是否為 i18n locale 檔案"""
+        rel_path = str(file_path.relative_to(self.project_path))
+        return 'locales/' in rel_path or '/locales/' in rel_path
 
     def check_emoji_usage(self):
         """檢查程式碼中的 Emoji 使用（應改用 icon font）"""

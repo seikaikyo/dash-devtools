@@ -152,6 +152,10 @@ class QualityValidator:
         large_files = []
 
         for file_path in self._get_source_files():
+            # 跳過 i18n locale 檔案（翻譯檔天生就長）
+            if self._is_locale_file(file_path):
+                continue
+
             try:
                 content = file_path.read_text(encoding='utf-8')
                 line_count = len(content.splitlines())
@@ -189,6 +193,10 @@ class QualityValidator:
         issues = []
 
         for file_path in self._get_source_files():
+            # 跳過日文相關檔案（日文漢字與簡體字共用字形）
+            if self._is_japanese_file(file_path):
+                continue
+
             try:
                 rel_path = str(file_path.relative_to(self.project_path))
 
@@ -231,6 +239,13 @@ class QualityValidator:
         issues = []
 
         for file_path in self._get_source_files():
+            # 跳過 i18n locale 檔案（翻譯文字可能含各地區用語）
+            if self._is_locale_file(file_path):
+                continue
+            # 跳過日文相關檔案
+            if self._is_japanese_file(file_path):
+                continue
+
             try:
                 rel_path = str(file_path.relative_to(self.project_path))
 
@@ -305,6 +320,10 @@ class QualityValidator:
         issues = []
 
         for file_path in self._get_source_files():
+            # 跳過 locale 檔案（BCP 47 語言代碼如 zh-TW 是合法命名）
+            if self._is_locale_file(file_path):
+                continue
+
             name = file_path.stem
 
             # JS/TS 檔案應該是 kebab-case 或 PascalCase
@@ -473,3 +492,19 @@ class QualityValidator:
         if re.match(r'^[a-z][a-zA-Z0-9]*$', name):
             return True
         return False
+
+    def _is_japanese_file(self, file_path):
+        """判斷是否為日文相關檔案（檔名含 ja 或路徑含 locales/ja）"""
+        rel_path = str(file_path.relative_to(self.project_path))
+        # locales/ja.ts, locales/ja.json 等
+        if '/locales/ja.' in rel_path or rel_path.startswith('locales/ja.'):
+            return True
+        # i18n 相關檔案中包含日文內容（如 ics-i18n.ts）
+        if 'i18n' in file_path.stem and file_path.suffix in ['.ts', '.js']:
+            return True
+        return False
+
+    def _is_locale_file(self, file_path):
+        """判斷是否為 i18n locale 檔案"""
+        rel_path = str(file_path.relative_to(self.project_path))
+        return 'locales/' in rel_path or '/locales/' in rel_path

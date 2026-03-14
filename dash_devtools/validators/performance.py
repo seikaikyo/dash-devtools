@@ -139,16 +139,31 @@ class PerformanceValidator:
                 return
 
             all_content = ''
-            for f in src_path.rglob('*.js'):
+            for ext in ['*.js', '*.ts', '*.vue']:
+                for f in src_path.rglob(ext):
+                    try:
+                        all_content += f.read_text(encoding='utf-8')
+                    except Exception:
+                        pass
+            # 也掃描根目錄的設定檔（main.ts 等）
+            for f in self.project_path.glob('*.ts'):
                 try:
                     all_content += f.read_text(encoding='utf-8')
                 except Exception:
                     pass
 
+            # 框架基礎依賴白名單（在 main.ts 或設定檔中使用，不會在元件中 import）
+            framework_deps = [
+                'vite', 'tailwindcss', 'daisyui',
+                '@primeuix/themes', '@vercel/analytics', '@vercel/speed-insights',
+                'pinia', 'primeicons', 'primevue', 'vue-router',
+                'vue', 'vue-i18n', '@vueuse/core',
+            ]
+
             unused = []
             for dep in deps:
                 # 跳過一些特殊依賴
-                if dep.startswith('@types/') or dep in ['vite', 'tailwindcss', 'daisyui']:
+                if dep.startswith('@types/') or dep in framework_deps:
                     continue
                 if dep not in all_content and f"'{dep}'" not in all_content:
                     unused.append(dep)
