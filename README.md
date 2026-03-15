@@ -782,7 +782,9 @@ black .
   - word_report.py 689 → 485 行，抽出 `reporters/templates` + `charts`
   - report.py 667 → 453 行，抽出 `reporters/report_data` + `screenshot`
   - quality.py 510 → 429 行，詞庫常數抽為 `constants.py`
+  - browser.py 541 → 354 行，便捷函數抽至 `browser_helpers.py`
 - **品質修復**: 中國用語修正、.gitignore 補齊 node_modules
+- **dash validate 達成 0 錯誤 0 警告**
 
 ### v2.1 (2026-03-14)
 
