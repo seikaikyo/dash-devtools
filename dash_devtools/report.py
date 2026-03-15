@@ -9,51 +9,25 @@
 - HTML 報告輸出
 """
 
-import json
-import subprocess
 import base64
 from pathlib import Path
 from datetime import datetime
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from typing import Dict, List
+
 from rich.console import Console
-from rich.panel import Panel
-from rich.text import Text
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
+from .reporters.report_data import (
+    TestResult,
+    ScreenshotResult,
+    ReportData,
+    collect_health,
+    collect_stats,
+    run_tests,
+)
+from .reporters.screenshot import take_screenshots
+
 console = Console()
-
-
-@dataclass
-class TestResult:
-    """測試結果"""
-    framework: str  # pytest, jest, vitest, etc.
-    passed: int = 0
-    failed: int = 0
-    skipped: int = 0
-    duration: float = 0.0
-    output: str = ""
-    success: bool = True
-
-
-@dataclass
-class ScreenshotResult:
-    """截圖結果"""
-    url: str
-    path: str
-    success: bool = True
-    error: str = ""
-
-
-@dataclass
-class ReportData:
-    """報告資料"""
-    project_name: str
-    generated_at: str
-    health_scores: Dict = field(default_factory=dict)
-    stats: Dict = field(default_factory=dict)
-    test_result: Optional[TestResult] = None
-    screenshots: List[ScreenshotResult] = field(default_factory=list)
 
 
 class ReportGenerator:
@@ -70,243 +44,25 @@ class ReportGenerator:
 
     def collect_health(self) -> Dict:
         """收集健康評分"""
-        from .health import HealthChecker
-
-        checker = HealthChecker(str(self.project_path))
-        scores = checker.check_all()
-
-        health_data = {
-            'total_score': sum(s.score for s in scores.values()) // len(scores),
-            'scores': {}
-        }
-
-        for key, score in scores.items():
-            health_data['scores'][key] = {
-                'score': score.score,
-                'category': score.category,
-                'issues': score.issues,
-                'recommendations': score.recommendations
-            }
-
+        health_data = collect_health(self.project_path)
         self.report_data.health_scores = health_data
         return health_data
 
     def collect_stats(self) -> Dict:
         """收集程式碼統計"""
-        from .stats import StatsCollector
-
-        collector = StatsCollector(str(self.project_path))
-        stats = collector.collect()
-
-        stats_data = {
-            'total_files': stats.total_files,
-            'total_lines': stats.total_lines,
-            'total_code_lines': stats.total_code_lines,
-            'size_bytes': stats.total_size_bytes,
-            'languages': {},
-            'largest_files': stats.largest_files[:5],
-            'complexity_issues': stats.complexity_issues
-        }
-
-        for name, lang in stats.languages.items():
-            stats_data['languages'][name] = {
-                'files': lang.files,
-                'lines': lang.lines
-            }
-
+        stats_data = collect_stats(self.project_path)
         self.report_data.stats = stats_data
         return stats_data
 
     def run_tests(self) -> TestResult:
         """執行測試"""
-        result = TestResult(framework='unknown')
-
-        # 偵測測試框架
-        package_json = self.project_path / 'package.json'
-        if package_json.exists():
-            try:
-                pkg = json.loads(package_json.read_text())
-                deps = {**pkg.get('dependencies', {}), **pkg.get('devDependencies', {})}
-                scripts = pkg.get('scripts', {})
-
-                # 判斷測試框架
-                if 'vitest' in deps:
-                    result.framework = 'vitest'
-                elif 'jest' in deps:
-                    result.framework = 'jest'
-                elif '@angular-devkit/build-angular' in deps:
-                    result.framework = 'karma'
-
-                # 執行測試
-                if 'test' in scripts:
-                    try:
-                        proc = subprocess.run(
-                            ['npm', 'test', '--', '--passWithNoTests', '--run'],
-                            cwd=self.project_path,
-                            capture_output=True,
-                            text=True,
-                            timeout=120
-                        )
-                        result.output = proc.stdout + proc.stderr
-                        result.success = proc.returncode == 0
-
-                        # 簡單解析結果
-                        if 'passed' in result.output.lower():
-                            result.passed = result.output.lower().count('passed')
-                        if 'failed' in result.output.lower():
-                            result.failed = result.output.lower().count('failed')
-
-                    except subprocess.TimeoutExpired:
-                        result.success = False
-                        result.output = "測試超時 (120秒)"
-                    except Exception as e:
-                        result.success = False
-                        result.output = str(e)
-
-            except Exception:
-                pass
-
-        # Python 專案
-        requirements = self.project_path / 'requirements.txt'
-        pytest_ini = self.project_path / 'pytest.ini'
-        if requirements.exists() or pytest_ini.exists():
-            result.framework = 'pytest'
-            try:
-                proc = subprocess.run(
-                    ['python', '-m', 'pytest', '--tb=short', '-q'],
-                    cwd=self.project_path,
-                    capture_output=True,
-                    text=True,
-                    timeout=120
-                )
-                result.output = proc.stdout + proc.stderr
-                result.success = proc.returncode == 0
-
-                # 解析 pytest 結果
-                import re
-                match = re.search(r'(\d+) passed', result.output)
-                if match:
-                    result.passed = int(match.group(1))
-                match = re.search(r'(\d+) failed', result.output)
-                if match:
-                    result.failed = int(match.group(1))
-
-            except Exception as e:
-                result.output = str(e)
-                result.success = False
-
+        result = run_tests(self.project_path)
         self.report_data.test_result = result
         return result
 
     def take_screenshots(self, urls: List[str] = None) -> List[ScreenshotResult]:
         """使用 agent-browser 截圖"""
-        import shutil
-        results = []
-
-        # 檢查 agent-browser 是否安裝
-        if not shutil.which('agent-browser'):
-            console.print("[yellow]agent-browser 未安裝，跳過截圖[/yellow]")
-            console.print("[dim]安裝方式: npm install -g agent-browser && agent-browser install[/dim]")
-            return results
-
-        # 如果沒指定 URL，嘗試偵測本地開發伺服器
-        if not urls:
-            package_json = self.project_path / 'package.json'
-            if package_json.exists():
-                try:
-                    pkg = json.loads(package_json.read_text())
-                    scripts = pkg.get('scripts', {})
-                    if 'dev' in scripts or 'start' in scripts:
-                        urls = ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:4200']
-                except Exception:
-                    pass
-
-        if not urls:
-            return results
-
-        # 確保報告目錄存在
-        screenshots_dir = self.report_dir / 'screenshots'
-        screenshots_dir.mkdir(parents=True, exist_ok=True)
-
-        # 使用 agent-browser 截圖
-        for url in urls:
-            screenshot_path = screenshots_dir / f"screenshot_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
-
-            try:
-                # 開啟頁面
-                open_result = subprocess.run(
-                    ['agent-browser', 'open', url],
-                    capture_output=True,
-                    text=True,
-                    timeout=30
-                )
-
-                if open_result.returncode != 0:
-                    results.append(ScreenshotResult(
-                        url=url,
-                        path="",
-                        success=False,
-                        error=f"無法開啟頁面: {open_result.stderr}"
-                    ))
-                    subprocess.run(['agent-browser', 'close'], capture_output=True)
-                    continue
-
-                # 等待頁面載入
-                subprocess.run(
-                    ['agent-browser', 'wait', '--load', 'networkidle'],
-                    capture_output=True,
-                    timeout=15
-                )
-
-                # 額外等待 JS 渲染
-                subprocess.run(
-                    ['agent-browser', 'wait', '2000'],
-                    capture_output=True,
-                    timeout=5
-                )
-
-                # 截圖
-                screenshot_result = subprocess.run(
-                    ['agent-browser', 'screenshot', str(screenshot_path), '--full'],
-                    capture_output=True,
-                    text=True,
-                    timeout=30
-                )
-
-                # 關閉瀏覽器
-                subprocess.run(['agent-browser', 'close'], capture_output=True)
-
-                if screenshot_result.returncode == 0 and screenshot_path.exists():
-                    results.append(ScreenshotResult(
-                        url=url,
-                        path=str(screenshot_path),
-                        success=True
-                    ))
-                else:
-                    results.append(ScreenshotResult(
-                        url=url,
-                        path="",
-                        success=False,
-                        error=screenshot_result.stderr or "截圖失敗"
-                    ))
-
-            except subprocess.TimeoutExpired:
-                subprocess.run(['agent-browser', 'close'], capture_output=True)
-                results.append(ScreenshotResult(
-                    url=url,
-                    path="",
-                    success=False,
-                    error="操作超時"
-                ))
-            except Exception as e:
-                subprocess.run(['agent-browser', 'close'], capture_output=True)
-                results.append(ScreenshotResult(
-                    url=url,
-                    path="",
-                    success=False,
-                    error=str(e)
-                ))
-
+        results = take_screenshots(self.project_path, self.report_dir, urls)
         self.report_data.screenshots = results
         return results
 
@@ -315,27 +71,35 @@ class ReportGenerator:
         self.report_dir.mkdir(parents=True, exist_ok=True)
         report_path = self.report_dir / f"report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
 
-        # 取得評分顏色
-        def get_color(score):
-            if score >= 90:
-                return '#22c55e'  # green
-            elif score >= 70:
-                return '#eab308'  # yellow
-            elif score >= 50:
-                return '#f97316'  # orange
-            else:
-                return '#ef4444'  # red
+        html = _build_html(self.report_data, self.project_name)
 
-        # 語言分佈圖資料
-        languages_data = self.report_data.stats.get('languages', {})
-        total_lines = self.report_data.stats.get('total_lines', 1)
+        report_path.write_text(html, encoding='utf-8')
+        return str(report_path)
 
-        lang_bars = ""
-        colors = ['#3b82f6', '#22c55e', '#eab308', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316', '#ec4899']
-        for i, (name, data) in enumerate(sorted(languages_data.items(), key=lambda x: x[1]['lines'], reverse=True)[:6]):
-            pct = (data['lines'] / total_lines) * 100
-            color = colors[i % len(colors)]
-            lang_bars += f'''
+
+def _get_color(score):
+    """取得評分顏色"""
+    if score >= 90:
+        return '#22c55e'  # green
+    elif score >= 70:
+        return '#eab308'  # yellow
+    elif score >= 50:
+        return '#f97316'  # orange
+    else:
+        return '#ef4444'  # red
+
+
+def _build_lang_bars(stats: Dict) -> str:
+    """產生語言分佈 HTML"""
+    languages_data = stats.get('languages', {})
+    total_lines = stats.get('total_lines', 1)
+
+    lang_bars = ""
+    colors = ['#3b82f6', '#22c55e', '#eab308', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316', '#ec4899']
+    for i, (name, data) in enumerate(sorted(languages_data.items(), key=lambda x: x[1]['lines'], reverse=True)[:6]):
+        pct = (data['lines'] / total_lines) * 100
+        color = colors[i % len(colors)]
+        lang_bars += f'''
             <div class="lang-bar">
                 <span class="lang-name">{name}</span>
                 <div class="bar-container">
@@ -345,27 +109,33 @@ class ReportGenerator:
             </div>
             '''
 
-        # 健康評分卡片
-        health = self.report_data.health_scores
-        total_score = health.get('total_score', 0)
-        score_cards = ""
-        for key, data in health.get('scores', {}).items():
-            score = data['score']
-            category = data['category']
-            score_cards += f'''
+    return lang_bars
+
+
+def _build_score_cards(health: Dict) -> str:
+    """產生健康評分卡片 HTML"""
+    score_cards = ""
+    for key, data in health.get('scores', {}).items():
+        score = data['score']
+        category = data['category']
+        score_cards += f'''
             <div class="score-card">
-                <div class="score-value" style="color: {get_color(score)}">{score}</div>
+                <div class="score-value" style="color: {_get_color(score)}">{score}</div>
                 <div class="score-label">{category}</div>
             </div>
             '''
+    return score_cards
 
-        # 測試結果
-        test_html = ""
-        if self.report_data.test_result:
-            tr = self.report_data.test_result
-            test_status = "PASS" if tr.success else "FAIL"
-            test_color = "#22c55e" if tr.success else "#ef4444"
-            test_html = f'''
+
+def _build_test_html(test_result) -> str:
+    """產生測試結果 HTML"""
+    if not test_result:
+        return ""
+
+    tr = test_result
+    test_status = "PASS" if tr.success else "FAIL"
+    test_color = "#22c55e" if tr.success else "#ef4444"
+    return f'''
             <div class="section">
                 <h2>測試結果</h2>
                 <div class="test-result">
@@ -379,21 +149,22 @@ class ReportGenerator:
             </div>
             '''
 
-        # 截圖
-        screenshots_html = ""
-        for ss in self.report_data.screenshots:
-            if ss.success and Path(ss.path).exists():
-                # 轉換為 base64
-                img_data = base64.b64encode(Path(ss.path).read_bytes()).decode()
-                screenshots_html += f'''
+
+def _build_screenshots_html(screenshots: list) -> str:
+    """產生截圖 HTML"""
+    screenshots_html = ""
+    for ss in screenshots:
+        if ss.success and Path(ss.path).exists():
+            img_data = base64.b64encode(Path(ss.path).read_bytes()).decode()
+            screenshots_html += f'''
                 <div class="screenshot">
                     <div class="screenshot-url">{ss.url}</div>
                     <img src="data:image/png;base64,{img_data}" alt="Screenshot" />
                 </div>
                 '''
 
-        if screenshots_html:
-            screenshots_html = f'''
+    if screenshots_html:
+        screenshots_html = f'''
             <div class="section">
                 <h2>UI 截圖</h2>
                 <div class="screenshots-grid">
@@ -401,22 +172,38 @@ class ReportGenerator:
                 </div>
             </div>
             '''
+    return screenshots_html
 
-        # 問題與建議
-        issues_html = ""
-        recommendations_html = ""
-        for data in health.get('scores', {}).values():
-            for issue in data.get('issues', []):
-                issues_html += f'<li class="issue">{issue}</li>'
-            for rec in data.get('recommendations', []):
-                recommendations_html += f'<li class="recommendation">{rec}</li>'
 
-        html = f'''<!DOCTYPE html>
+def _build_issues_html(health: Dict) -> tuple:
+    """產生問題與建議 HTML"""
+    issues_html = ""
+    recommendations_html = ""
+    for data in health.get('scores', {}).values():
+        for issue in data.get('issues', []):
+            issues_html += f'<li class="issue">{issue}</li>'
+        for rec in data.get('recommendations', []):
+            recommendations_html += f'<li class="recommendation">{rec}</li>'
+    return issues_html, recommendations_html
+
+
+def _build_html(report_data: ReportData, project_name: str) -> str:
+    """組裝完整 HTML 報告"""
+    health = report_data.health_scores
+    total_score = health.get('total_score', 0)
+
+    lang_bars = _build_lang_bars(report_data.stats)
+    score_cards = _build_score_cards(health)
+    test_html = _build_test_html(report_data.test_result)
+    screenshots_html = _build_screenshots_html(report_data.screenshots)
+    issues_html, recommendations_html = _build_issues_html(health)
+
+    html = f'''<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{self.project_name} - 專案報告</title>
+    <title>{project_name} - 專案報告</title>
     <style>
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
         body {{
@@ -439,7 +226,7 @@ class ReportGenerator:
         .total-score {{
             font-size: 4rem;
             font-weight: bold;
-            color: {get_color(total_score)};
+            color: {_get_color(total_score)};
             margin: 1rem 0;
         }}
         .section {{
@@ -542,7 +329,7 @@ class ReportGenerator:
 <body>
     <div class="container">
         <div class="header">
-            <h1>{self.project_name}</h1>
+            <h1>{project_name}</h1>
             <div class="date">報告產生時間: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</div>
             <div class="total-score">{total_score}/100</div>
         </div>
@@ -558,19 +345,19 @@ class ReportGenerator:
             <h2>程式碼統計</h2>
             <div class="stats-grid">
                 <div class="stat-item">
-                    <div class="stat-value">{self.report_data.stats.get('total_files', 0):,}</div>
+                    <div class="stat-value">{report_data.stats.get('total_files', 0):,}</div>
                     <div class="stat-label">檔案數</div>
                 </div>
                 <div class="stat-item">
-                    <div class="stat-value">{self.report_data.stats.get('total_lines', 0):,}</div>
+                    <div class="stat-value">{report_data.stats.get('total_lines', 0):,}</div>
                     <div class="stat-label">總行數</div>
                 </div>
                 <div class="stat-item">
-                    <div class="stat-value">{self.report_data.stats.get('total_code_lines', 0):,}</div>
+                    <div class="stat-value">{report_data.stats.get('total_code_lines', 0):,}</div>
                     <div class="stat-label">程式碼行數</div>
                 </div>
                 <div class="stat-item">
-                    <div class="stat-value">{self.report_data.stats.get('size_bytes', 0) / 1024:.0f} KB</div>
+                    <div class="stat-value">{report_data.stats.get('size_bytes', 0) / 1024:.0f} KB</div>
                     <div class="stat-label">大小</div>
                 </div>
             </div>
@@ -600,8 +387,7 @@ class ReportGenerator:
 </body>
 </html>'''
 
-        report_path.write_text(html, encoding='utf-8')
-        return str(report_path)
+    return html
 
 
 def run_report(project_path: str, include_tests: bool = True,

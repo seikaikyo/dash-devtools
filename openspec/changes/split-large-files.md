@@ -1,7 +1,7 @@
 ---
 title: 拆分超過 500 行的大型檔案
 type: refactor
-status: backlog
+status: completed
 created: 2026-03-15
 ---
 

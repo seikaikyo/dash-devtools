@@ -9,7 +9,6 @@ Word 測試報告生成模組
 - 截圖 (可選)
 """
 
-import io
 import tempfile
 from pathlib import Path
 from datetime import datetime
@@ -17,133 +16,37 @@ from typing import Dict, List, Optional
 
 try:
     from docx import Document
-    from docx.shared import Inches, Pt, Cm, RGBColor
+    from docx.shared import Inches, Pt, RGBColor
     from docx.enum.text import WD_ALIGN_PARAGRAPH
-    from docx.enum.table import WD_TABLE_ALIGNMENT
-    from docx.enum.style import WD_STYLE_TYPE
-    from docx.oxml.ns import qn
-    from docx.oxml import OxmlElement
     HAS_DOCX = True
 except ImportError:
     HAS_DOCX = False
 
-try:
-    import matplotlib
-    matplotlib.use('Agg')  # 非互動模式
-    import matplotlib.pyplot as plt
-    HAS_MATPLOTLIB = True
-except ImportError:
-    HAS_MATPLOTLIB = False
-
 from rich.console import Console
 
+from .reporters import (
+    HAS_MATPLOTLIB,
+    create_pass_rate_chart,
+    create_test_type_chart,
+    set_cell_shading,
+    format_duration,
+    format_table_duration,
+    rgb,
+    build_single_test_case,
+    TYPE_LABELS,
+    TYPE_DESCRIPTIONS,
+    COLOR_PASS_RGB,
+    COLOR_FAIL_RGB,
+    COLOR_GREY_RGB,
+    COLOR_LIGHT_GREY_RGB,
+    COLOR_SUBTITLE_RGB,
+    COLOR_HEADER_HEX,
+    COLOR_LABEL_BG_HEX,
+    COLOR_PASS_BG_HEX,
+    COLOR_FAIL_BG_HEX,
+)
+
 console = Console()
-
-
-def set_cell_shading(cell, color: str):
-    """設定表格儲存格背景色"""
-    shading = OxmlElement('w:shd')
-    shading.set(qn('w:fill'), color)
-    cell._tc.get_or_add_tcPr().append(shading)
-
-
-def create_pass_rate_chart(passed: int, failed: int) -> Optional[bytes]:
-    """建立通過率圓餅圖"""
-    if not HAS_MATPLOTLIB:
-        return None
-
-    # 設定中文字型 (macOS)
-    plt.rcParams['font.sans-serif'] = ['Arial Unicode MS', 'Heiti TC', 'PingFang TC', 'STHeiti']
-    plt.rcParams['axes.unicode_minus'] = False
-
-    fig, ax = plt.subplots(figsize=(4, 4))
-
-    if passed + failed == 0:
-        sizes = [1]
-        colors = ['#E0E0E0']
-        labels = ['無測試']
-    else:
-        sizes = [passed, failed] if failed > 0 else [passed]
-        colors = ['#4CAF50', '#F44336'] if failed > 0 else ['#4CAF50']
-        labels = ['通過', '失敗'] if failed > 0 else ['通過']
-
-    wedges, texts, autotexts = ax.pie(
-        sizes,
-        labels=labels,
-        colors=colors,
-        autopct='%1.1f%%',
-        startangle=90,
-        textprops={'fontsize': 12}
-    )
-
-    ax.set_title('測試通過率', fontsize=14, fontweight='bold')
-
-    # 儲存為 bytes
-    buf = io.BytesIO()
-    plt.savefig(buf, format='png', dpi=150, bbox_inches='tight', facecolor='white')
-    plt.close(fig)
-    buf.seek(0)
-    return buf.read()
-
-
-def create_test_type_chart(results: Dict) -> Optional[bytes]:
-    """建立各類型測試長條圖"""
-    if not HAS_MATPLOTLIB:
-        return None
-
-    # 過濾掉未設定的測試
-    configured_results = {k: v for k, v in results.items() if not v.get('not_configured', False)}
-    if not configured_results:
-        return None
-
-    # 設定中文字型
-    plt.rcParams['font.sans-serif'] = ['Arial Unicode MS', 'Heiti TC', 'PingFang TC', 'Microsoft JhengHei']
-    plt.rcParams['axes.unicode_minus'] = False
-
-    fig, ax = plt.subplots(figsize=(8, 4))
-
-    types = list(configured_results.keys())
-    passed = [configured_results[t].get('passed', 0) for t in types]
-    failed = [configured_results[t].get('failed', 0) for t in types]
-
-    x = range(len(types))
-    width = 0.35
-
-    bars1 = ax.bar([i - width/2 for i in x], passed, width, label='通過', color='#4CAF50')
-    bars2 = ax.bar([i + width/2 for i in x], failed, width, label='失敗', color='#F44336')
-
-    ax.set_ylabel('測試數量')
-    ax.set_title('各類型測試結果', fontsize=14, fontweight='bold')
-    ax.set_xticks(x)
-    ax.set_xticklabels(types)
-    ax.legend()
-
-    # 加上數值標籤
-    for bar in bars1:
-        height = bar.get_height()
-        if height > 0:
-            ax.annotate(f'{int(height)}',
-                       xy=(bar.get_x() + bar.get_width() / 2, height),
-                       xytext=(0, 3),
-                       textcoords="offset points",
-                       ha='center', va='bottom', fontsize=10)
-
-    for bar in bars2:
-        height = bar.get_height()
-        if height > 0:
-            ax.annotate(f'{int(height)}',
-                       xy=(bar.get_x() + bar.get_width() / 2, height),
-                       xytext=(0, 3),
-                       textcoords="offset points",
-                       ha='center', va='bottom', fontsize=10)
-
-    plt.tight_layout()
-
-    buf = io.BytesIO()
-    plt.savefig(buf, format='png', dpi=150, bbox_inches='tight', facecolor='white')
-    plt.close(fig)
-    buf.seek(0)
-    return buf.read()
 
 
 def generate_word_report(
@@ -177,6 +80,71 @@ def generate_word_report(
     style.font.size = Pt(12)
 
     # ========== 封面頁 ==========
+    _build_cover_page(doc, project_name, test_results)
+    doc.add_page_break()
+
+    # ========== 測試摘要 ==========
+    summary = test_results.get('summary', {})
+    total_passed = summary.get('total_passed', 0)
+    total_failed = summary.get('total_failed', 0)
+    total_duration = summary.get('total_duration', 0)
+    coverage = summary.get('coverage', 0)
+
+    # 如果 total_duration 為 0，從各測試類型的 test_cases 計算
+    if total_duration == 0:
+        tests = test_results.get('tests', {})
+        for result in tests.values():
+            test_cases = result.get('test_cases', [])
+            total_duration += sum(tc.get('duration', 0) for tc in test_cases)
+
+    _build_summary_section(doc, total_passed, total_failed, total_duration, coverage)
+
+    # ========== 通過率圖表 ==========
+    if include_charts and HAS_MATPLOTLIB:
+        _insert_chart(doc, '測試通過率',
+                      create_pass_rate_chart(total_passed, total_failed),
+                      width=Inches(3.5))
+
+    # ========== 各類型測試結果 ==========
+    tests = test_results.get('tests', {})
+    configured_tests = {k: v for k, v in tests.items() if not v.get('not_configured', False)}
+    _build_test_results_table(doc, configured_tests)
+
+    # ========== 詳細測試案例列表 (含截圖) ==========
+    _build_test_case_details(doc, configured_tests)
+
+    # ========== 各類型長條圖 ==========
+    if include_charts and HAS_MATPLOTLIB and tests:
+        _insert_chart(doc, '測試結果分布',
+                      create_test_type_chart(tests),
+                      width=Inches(6), heading_level=2)
+
+    doc.add_page_break()
+
+    # ========== 測試類型說明 ==========
+    _build_type_descriptions(doc)
+
+    # ========== 額外截圖 (可選) ==========
+    if screenshots:
+        _build_extra_screenshots(doc, screenshots)
+
+    # ========== 頁尾 ==========
+    doc.add_paragraph()
+    footer = doc.add_paragraph()
+    footer.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    footer_run = footer.add_run('Generated by DashAI DevTools')
+    footer_run.font.size = Pt(10)
+    footer_run.font.color.rgb = rgb(COLOR_LIGHT_GREY_RGB)
+
+    # 儲存文件
+    output_file = Path(output_path)
+    doc.save(output_file)
+
+    return str(output_file)
+
+
+def _build_cover_page(doc, project_name: str, test_results: Dict):
+    """建立封面頁"""
     # 標題
     title = doc.add_heading('', level=0)
     title_run = title.add_run(f'{project_name} 測試報告')
@@ -189,7 +157,7 @@ def generate_word_report(
     subtitle.alignment = WD_ALIGN_PARAGRAPH.CENTER
     sub_run = subtitle.add_run('四大類型測試套件執行結果')
     sub_run.font.size = Pt(18)
-    sub_run.font.color.rgb = RGBColor(100, 100, 100)
+    sub_run.font.color.rgb = rgb(COLOR_SUBTITLE_RGB)
 
     # 日期
     doc.add_paragraph()
@@ -208,48 +176,24 @@ def generate_word_report(
     overall_success = test_results.get('overall_success', True)
     if overall_success:
         status_run = status_para.add_run('ALL TESTS PASSED')
-        status_run.font.size = Pt(24)
-        status_run.font.bold = True
-        status_run.font.color.rgb = RGBColor(76, 175, 80)  # 綠色
+        status_run.font.color.rgb = rgb(COLOR_PASS_RGB)
     else:
         status_run = status_para.add_run('SOME TESTS FAILED')
-        status_run.font.size = Pt(24)
-        status_run.font.bold = True
-        status_run.font.color.rgb = RGBColor(244, 67, 54)  # 紅色
+        status_run.font.color.rgb = rgb(COLOR_FAIL_RGB)
 
-    doc.add_page_break()
+    status_run.font.size = Pt(24)
+    status_run.font.bold = True
 
-    # ========== 測試摘要 ==========
+
+def _build_summary_section(doc, total_passed: int, total_failed: int,
+                           total_duration: float, coverage: float):
+    """建立測試摘要區段"""
     doc.add_heading('測試摘要', level=1)
 
-    summary = test_results.get('summary', {})
-    total_passed = summary.get('total_passed', 0)
-    total_failed = summary.get('total_failed', 0)
-    total_duration = summary.get('total_duration', 0)
-    coverage = summary.get('coverage', 0)
-
-    # 如果 total_duration 為 0，從各測試類型的 test_cases 計算
-    if total_duration == 0:
-        tests = test_results.get('tests', {})
-        for result in tests.values():
-            test_cases = result.get('test_cases', [])
-            total_duration += sum(tc.get('duration', 0) for tc in test_cases)
-
-    # 摘要表格
     summary_table = doc.add_table(rows=5, cols=2)
     summary_table.style = 'Table Grid'
 
-    # 智慧格式化總執行時間
-    if total_duration <= 0:
-        duration_str = '-'
-    elif total_duration < 0.001:  # < 1ms
-        duration_str = f'{total_duration * 1000000:.0f}us'
-    elif total_duration < 0.1:  # < 100ms
-        duration_str = f'{total_duration * 1000:.2f}ms'
-    elif total_duration < 1:  # < 1s
-        duration_str = f'{total_duration * 1000:.0f}ms'
-    else:
-        duration_str = f'{total_duration:.1f}s'
+    duration_str = format_duration(total_duration)
 
     summary_data = [
         ('總測試數', str(total_passed + total_failed)),
@@ -263,271 +207,125 @@ def generate_word_report(
         row = summary_table.rows[i]
         row.cells[0].text = label
         row.cells[1].text = value
-        # 設定標籤欄背景色
-        set_cell_shading(row.cells[0], 'F5F5F5')
+        set_cell_shading(row.cells[0], COLOR_LABEL_BG_HEX)
 
     doc.add_paragraph()
 
-    # ========== 通過率圖表 ==========
-    if include_charts and HAS_MATPLOTLIB:
-        doc.add_heading('測試通過率', level=2)
 
-        chart_data = create_pass_rate_chart(total_passed, total_failed)
-        if chart_data:
-            with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp:
-                tmp.write(chart_data)
-                tmp_path = tmp.name
+def _insert_chart(doc, title: str, chart_data: Optional[bytes],
+                  width=None, heading_level: int = 2):
+    """插入圖表到文件"""
+    doc.add_heading(title, level=heading_level)
 
-            doc.add_picture(tmp_path, width=Inches(3.5))
-            last_paragraph = doc.paragraphs[-1]
-            last_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    if chart_data:
+        with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp:
+            tmp.write(chart_data)
+            tmp_path = tmp.name
 
-            Path(tmp_path).unlink(missing_ok=True)
+        doc.add_picture(tmp_path, width=width)
+        last_paragraph = doc.paragraphs[-1]
+        last_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
-        doc.add_paragraph()
+        Path(tmp_path).unlink(missing_ok=True)
 
-    # ========== 各類型測試結果 ==========
+    doc.add_paragraph()
+
+
+def _build_test_results_table(doc, configured_tests: Dict):
+    """建立各類型測試結果表格"""
     doc.add_heading('各類型測試結果', level=1)
 
-    tests = test_results.get('tests', {})
-
-    # 過濾掉未設定的測試
-    configured_tests = {k: v for k, v in tests.items() if not v.get('not_configured', False)}
-
-    # 如果沒有任何已設定的測試
     if not configured_tests:
         p = doc.add_paragraph()
         run = p.add_run('此專案未設定任何測試框架')
-        run.font.color.rgb = RGBColor(128, 128, 128)
+        run.font.color.rgb = rgb(COLOR_GREY_RGB)
         run.italic = True
-    else:
-        # 結果表格
-        result_table = doc.add_table(rows=len(configured_tests) + 1, cols=5)
-        result_table.style = 'Table Grid'
+        doc.add_paragraph()
+        return
 
-        # 表頭
-        header_row = result_table.rows[0]
-        headers = ['測試類型', '狀態', '通過', '失敗', '時間']
-        for i, header in enumerate(headers):
-            cell = header_row.cells[i]
-            cell.text = header
-            set_cell_shading(cell, '2196F3')
-            for paragraph in cell.paragraphs:
-                for run in paragraph.runs:
-                    run.font.bold = True
-                    run.font.color.rgb = RGBColor(255, 255, 255)
+    result_table = doc.add_table(rows=len(configured_tests) + 1, cols=5)
+    result_table.style = 'Table Grid'
 
-        # 資料列
-        type_labels = {
-            'UIT': '單元測試 (UIT)',
-            'SMOKE': '煙霧測試 (Smoke)',
-            'E2E': '端對端測試 (E2E)',
-            'UAT': '驗收測試 (UAT)'
-        }
+    # 表頭
+    header_row = result_table.rows[0]
+    headers = ['測試類型', '狀態', '通過', '失敗', '時間']
+    for i, header in enumerate(headers):
+        cell = header_row.cells[i]
+        cell.text = header
+        set_cell_shading(cell, COLOR_HEADER_HEX)
+        for paragraph in cell.paragraphs:
+            for run in paragraph.runs:
+                run.font.bold = True
+                run.font.color.rgb = RGBColor(255, 255, 255)
 
-        for i, (test_type, result) in enumerate(configured_tests.items(), start=1):
-            row = result_table.rows[i]
-            row.cells[0].text = type_labels.get(test_type, test_type)
+    # 資料列
+    for i, (test_type, result) in enumerate(configured_tests.items(), start=1):
+        row = result_table.rows[i]
+        row.cells[0].text = TYPE_LABELS.get(test_type, test_type)
 
-            success = result.get('success', True)
-            row.cells[1].text = 'PASS' if success else 'FAIL'
-            # 狀態顏色
-            status_cell = row.cells[1]
-            if success:
-                set_cell_shading(status_cell, 'C8E6C9')  # 淺綠
-            else:
-                set_cell_shading(status_cell, 'FFCDD2')  # 淺紅
+        success = result.get('success', True)
+        row.cells[1].text = 'PASS' if success else 'FAIL'
+        status_cell = row.cells[1]
+        if success:
+            set_cell_shading(status_cell, COLOR_PASS_BG_HEX)
+        else:
+            set_cell_shading(status_cell, COLOR_FAIL_BG_HEX)
 
-            row.cells[2].text = str(result.get('passed', 0))
-            row.cells[3].text = str(result.get('failed', 0))
-            # 計算總時間 (從 test_cases 或 result.duration)
-            duration = result.get('duration', 0)
-            if duration == 0:
-                test_cases = result.get('test_cases', [])
-                duration = sum(tc.get('duration', 0) for tc in test_cases)
-            # 智慧格式化 (所有單位都是秒，< 1s 顯示 ms)
-            if duration <= 0:
-                row.cells[4].text = "-"
-            elif duration < 0.1:  # < 100ms 顯示 ms
-                row.cells[4].text = f"{duration * 1000:.2f}ms"
-            elif duration < 1:  # < 1s 顯示 ms (整數)
-                row.cells[4].text = f"{duration * 1000:.0f}ms"
-            else:
-                row.cells[4].text = f"{duration:.1f}s"
+        row.cells[2].text = str(result.get('passed', 0))
+        row.cells[3].text = str(result.get('failed', 0))
+
+        # 計算總時間
+        duration = result.get('duration', 0)
+        if duration == 0:
+            test_cases = result.get('test_cases', [])
+            duration = sum(tc.get('duration', 0) for tc in test_cases)
+        row.cells[4].text = format_table_duration(duration)
 
     doc.add_paragraph()
 
-    # ========== 詳細測試案例列表 (含截圖) ==========
+
+def _build_test_case_details(doc, configured_tests: Dict):
+    """建立詳細測試案例列表 (含截圖)"""
     for test_type, result in configured_tests.items():
         test_cases = result.get('test_cases', [])
         if not test_cases:
             continue
 
         doc.add_page_break()
-        doc.add_heading(f'{type_labels.get(test_type, test_type)} - 測試案例明細', level=1)
+        doc.add_heading(f'{TYPE_LABELS.get(test_type, test_type)} - 測試案例明細', level=1)
 
         for i, tc in enumerate(test_cases, start=1):
-            test_name = tc.get('name', '')
-            status = tc.get('status', 'passed')
-            duration = tc.get('duration', 0)
-            screenshot_path = tc.get('screenshot', '')
+            build_single_test_case(doc, tc, i)
 
-            # 測試案例標題
-            p = doc.add_paragraph()
-            # 狀態圖示
-            if status == 'passed':
-                status_run = p.add_run('[PASS] ')
-                status_run.font.color.rgb = RGBColor(76, 175, 80)
-                status_run.bold = True
-            elif status == 'failed':
-                status_run = p.add_run('[FAIL] ')
-                status_run.font.color.rgb = RGBColor(244, 67, 54)
-                status_run.bold = True
-            else:
-                status_run = p.add_run('[SKIP] ')
-                status_run.font.color.rgb = RGBColor(255, 193, 7)
-                status_run.bold = True
 
-            # 測試名稱
-            name_run = p.add_run(f'{i}. {test_name}')
-            name_run.font.size = Pt(11)
-
-            # 時間 (單位: 秒，小於 1 秒顯示毫秒)
-            if duration and duration > 0:
-                if duration < 0.001:  # < 1ms
-                    time_str = f'{duration * 1000000:.0f}us'
-                elif duration < 0.1:  # < 100ms
-                    time_str = f'{duration * 1000:.2f}ms'
-                elif duration < 1:  # < 1s
-                    time_str = f'{duration * 1000:.0f}ms'
-                else:
-                    time_str = f'{duration:.2f}s'
-                time_run = p.add_run(f'  ({time_str})')
-                time_run.font.size = Pt(9)
-                time_run.font.color.rgb = RGBColor(128, 128, 128)
-
-            # 截圖
-            if screenshot_path and Path(screenshot_path).exists():
-                doc.add_picture(screenshot_path, width=Inches(5.5))
-                last_paragraph = doc.paragraphs[-1]
-                last_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            else:
-                # API 回應 (當沒有截圖時顯示)
-                api_response = tc.get('api_response', '')
-                terminal_output = tc.get('terminal_output', '')
-
-                if api_response:
-                    api_label = doc.add_paragraph()
-                    api_label_run = api_label.add_run('API Response:')
-                    api_label_run.font.size = Pt(10)
-                    api_label_run.font.color.rgb = RGBColor(33, 150, 243)
-                    api_label_run.bold = True
-
-                    # 格式化 JSON 顯示
-                    api_para = doc.add_paragraph()
-                    api_para.paragraph_format.left_indent = Inches(0.3)
-                    # 限制顯示長度
-                    display_response = api_response[:500] + ('...' if len(api_response) > 500 else '')
-                    api_run = api_para.add_run(display_response)
-                    api_run.font.size = Pt(9)
-                    api_run.font.name = 'Consolas'
-                    api_run.font.color.rgb = RGBColor(80, 80, 80)
-
-                elif terminal_output:
-                    # 終端輸出 (UIT 測試)
-                    term_label = doc.add_paragraph()
-                    term_label_run = term_label.add_run('Terminal Output:')
-                    term_label_run.font.size = Pt(10)
-                    term_label_run.font.color.rgb = RGBColor(156, 39, 176)
-                    term_label_run.bold = True
-
-                    term_para = doc.add_paragraph()
-                    term_para.paragraph_format.left_indent = Inches(0.3)
-                    display_output = terminal_output[:400] + ('...' if len(terminal_output) > 400 else '')
-                    term_run = term_para.add_run(display_output)
-                    term_run.font.size = Pt(9)
-                    term_run.font.name = 'Consolas'
-                    term_run.font.color.rgb = RGBColor(80, 80, 80)
-
-            # 錯誤訊息
-            error = tc.get('error', '')
-            if error:
-                error_p = doc.add_paragraph()
-                error_run = error_p.add_run(f'Error: {error[:300]}')
-                error_run.font.size = Pt(9)
-                error_run.font.color.rgb = RGBColor(244, 67, 54)
-
-            doc.add_paragraph()  # 間隔
-
-    # ========== 各類型長條圖 ==========
-    if include_charts and HAS_MATPLOTLIB and tests:
-        doc.add_heading('測試結果分布', level=2)
-
-        chart_data = create_test_type_chart(tests)
-        if chart_data:
-            with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp:
-                tmp.write(chart_data)
-                tmp_path = tmp.name
-
-            doc.add_picture(tmp_path, width=Inches(6))
-            last_paragraph = doc.paragraphs[-1]
-            last_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
-
-            Path(tmp_path).unlink(missing_ok=True)
-
-    doc.add_page_break()
-
-    # ========== 測試類型說明 ==========
+def _build_type_descriptions(doc):
+    """建立測試類型說明區段"""
     doc.add_heading('測試類型說明', level=1)
 
-    descriptions = [
-        ('UIT (Unit Integration Testing)',
-         '單元測試驗證各個模組、函數的正確性。使用 Vitest/Jest 框架執行，並產生程式碼覆蓋率報告。'),
-        ('Smoke Test (煙霧測試)',
-         '快速驗證系統關鍵路徑是否正常運作。包含應用程式啟動、頁面載入、API 健康檢查等基本功能。'),
-        ('E2E (End-to-End Testing)',
-         '端對端測試模擬真實使用情境，驗證完整的使用者流程。使用 Playwright 自動化測試框架執行。'),
-        ('UAT (User Acceptance Testing)',
-         '使用者驗收測試從業務角度驗證系統符合需求規格。測試案例依據使用者角色設計，確保系統滿足業務需求。'),
-    ]
-
-    for title, desc in descriptions:
+    for title, desc in TYPE_DESCRIPTIONS:
         p = doc.add_paragraph()
         title_run = p.add_run(title + ': ')
         title_run.bold = True
         p.add_run(desc)
         doc.add_paragraph()
 
-    # ========== 額外截圖 (可選，用於補充說明) ==========
-    if screenshots:
-        doc.add_page_break()
-        doc.add_heading('補充截圖', level=1)
 
-        for i, screenshot_path in enumerate(screenshots):
-            if Path(screenshot_path).exists():
-                p = doc.add_paragraph()
-                run = p.add_run(f'截圖 {i + 1}')
-                run.bold = True
-                run.font.size = Pt(12)
+def _build_extra_screenshots(doc, screenshots: List[str]):
+    """建立補充截圖區段"""
+    doc.add_page_break()
+    doc.add_heading('補充截圖', level=1)
 
-                doc.add_picture(screenshot_path, width=Inches(6))
-                last_paragraph = doc.paragraphs[-1]
-                last_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                doc.add_paragraph()
+    for i, screenshot_path in enumerate(screenshots):
+        if Path(screenshot_path).exists():
+            p = doc.add_paragraph()
+            run = p.add_run(f'截圖 {i + 1}')
+            run.bold = True
+            run.font.size = Pt(12)
 
-    # ========== 頁尾 ==========
-    doc.add_paragraph()
-    footer = doc.add_paragraph()
-    footer.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    footer_run = footer.add_run('Generated by DashAI DevTools')
-    footer_run.font.size = Pt(10)
-    footer_run.font.color.rgb = RGBColor(150, 150, 150)
-
-    # 儲存文件
-    output_file = Path(output_path)
-    doc.save(output_file)
-
-    return str(output_file)
+            doc.add_picture(screenshot_path, width=Inches(6))
+            last_paragraph = doc.paragraphs[-1]
+            last_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            doc.add_paragraph()
 
 
 def take_screenshots(project_path: str, urls: List[str] = None) -> List[str]:
@@ -571,8 +369,6 @@ const puppeteer = require("puppeteer");
 }})();
 '''
         try:
-            # 找有 puppeteer 的目錄
-            base = Path.home() / 'Documents' / 'github'
             puppeteer_dirs = [
                 project_path
             ]
@@ -617,7 +413,7 @@ def run_and_generate_report(
     """
     from .test_suite import TestSuiteRunner
 
-    project = Path(project_path).resolve()  # 使用 resolve() 取得完整路徑
+    project = Path(project_path).resolve()
     project_name = project.name
 
     if not output_path:
@@ -646,7 +442,7 @@ def run_and_generate_report(
                 'failed': v.failed,
                 'duration': v.duration,
                 'coverage': v.coverage,
-                'not_configured': v.not_configured,  # 標記未設定的測試
+                'not_configured': v.not_configured,
                 'test_cases': [
                     {
                         'name': tc.name,
@@ -664,7 +460,7 @@ def run_and_generate_report(
         }
     }
 
-    # 額外截圖 (Playwright 測試已自動截圖，這裡只用於補充)
+    # 額外截圖
     screenshots = []
     if include_screenshots and screenshot_urls:
         console.print(f"[cyan]擷取補充截圖...[/cyan]")

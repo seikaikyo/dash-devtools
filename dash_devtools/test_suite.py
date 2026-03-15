@@ -16,10 +16,9 @@
 
 import json
 import subprocess
-import re
 from pathlib import Path
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 from datetime import datetime
 from rich.console import Console
 from rich.panel import Panel
@@ -121,329 +120,35 @@ class TestSuiteRunner:
 
     def run_uit(self, with_coverage: bool = True) -> TestTypeResult:
         """執行 UIT 單元測試"""
-        result = TestTypeResult(test_type='UIT')
         setup = self.detect_test_setup()
 
-        try:
-            if setup['has_vitest']:
-                # 使用 JSON reporter 取得詳細結果
-                cmd = ['npx', 'vitest', 'run', '--reporter=json']
-                if with_coverage:
-                    cmd.append('--coverage')
-
-                proc = subprocess.run(
-                    cmd,
-                    cwd=self.project_path,
-                    capture_output=True,
-                    text=True,
-                    timeout=300
-                )
-
-                result.success = proc.returncode == 0
-                output = proc.stdout + proc.stderr
-
-                # 移除 ANSI 顏色碼
-                ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
-                clean_output = ansi_escape.sub('', output)
-
-                # 嘗試解析 JSON 並建立摘要
-                terminal_summary = ""
-                try:
-                    # 找到 JSON 部分 (Vitest JSON 輸出)
-                    json_match = re.search(r'(\{[\s\S]*"testResults"[\s\S]*\})', proc.stdout)
-                    if json_match:
-                        json_data = json.loads(json_match.group(1))
-
-                        # 從 JSON 提取統計資料
-                        result.passed = json_data.get('numPassedTests', 0)
-                        result.failed = json_data.get('numFailedTests', 0)
-                        num_total = json_data.get('numTotalTests', 0)
-                        num_suites = json_data.get('numTotalTestSuites', 0)
-
-                        # 解析覆蓋率 (從 stderr)
-                        coverage_match = re.search(r'All files\s+\|\s+([\d.]+)', clean_output)
-                        if coverage_match:
-                            result.coverage = float(coverage_match.group(1))
-
-                        # 從 JSON 建立人類可讀的摘要
-                        summary_parts = [
-                            f"Test Suites: {num_suites}",
-                            f"Tests: {result.passed} passed" + (f", {result.failed} failed" if result.failed else ""),
-                            f"Total: {num_total} tests"
-                        ]
-                        if result.coverage > 0:
-                            summary_parts.append(f"Coverage: {result.coverage:.1f}%")
-
-                        terminal_summary = '\n'.join(summary_parts)
-
-                        for test_file in json_data.get('testResults', []):
-                            file_name = Path(test_file.get('name', '')).name
-                            for assertion in test_file.get('assertionResults', []):
-                                test_name = ' › '.join(assertion.get('ancestorTitles', []) + [assertion.get('title', '')])
-                                status = assertion.get('status', 'passed')
-                                # Vitest duration 是毫秒，轉為秒 (與 Playwright 統一)
-                                duration = assertion.get('duration', 0) / 1000  # ms -> s
-                                result.test_cases.append(TestCase(
-                                    name=f"{file_name} › {test_name}",
-                                    status=status,
-                                    duration=duration
-                                    # UIT 不顯示 terminal_output (統計已在報告摘要中)
-                                ))
-                except (json.JSONDecodeError, KeyError):
-                    # 備援：從輸出解析測試名稱
-                    # 格式: ✓ src/app/core/services/warehouse.service.spec.ts (25 tests) 2ms
-                    for match in re.finditer(r'[✓✗]\s+(\S+\.spec\.ts)\s+\((\d+)\s+tests?\)', clean_output):
-                        file_name = Path(match.group(1)).name
-                        test_count = int(match.group(2))
-                        # 無法取得個別測試名稱，用檔案名代替
-                        result.test_cases.append(TestCase(
-                            name=f"{file_name} ({test_count} tests)",
-                            status='passed' if '✓' in match.group(0) else 'failed'
-                        ))
-
-                # 解析統計
-                match = re.search(r'Tests\s+(\d+)\s+passed', clean_output)
-                if match:
-                    result.passed = int(match.group(1))
-                else:
-                    match = re.search(r'(\d+)\s+passed', clean_output)
-                    if match:
-                        result.passed = int(match.group(1))
-
-                match = re.search(r'(\d+)\s+failed', clean_output)
-                if match:
-                    result.failed = int(match.group(1))
-
-                # 解析覆蓋率
-                match = re.search(r'All files\s+\|\s+([\d.]+)', clean_output)
-                if match:
-                    result.coverage = float(match.group(1))
-
-                # 解析時間
-                match = re.search(r'Duration\s+([\d.]+)ms', clean_output)
-                if match:
-                    result.duration = float(match.group(1)) / 1000
-                else:
-                    match = re.search(r'Duration\s+([\d.]+)s', clean_output)
-                    if match:
-                        result.duration = float(match.group(1))
-
-            elif setup['has_jest']:
-                cmd = ['npx', 'jest', '--coverage'] if with_coverage else ['npx', 'jest']
-                proc = subprocess.run(
-                    cmd,
-                    cwd=self.project_path,
-                    capture_output=True,
-                    text=True,
-                    timeout=300
-                )
-
-                result.success = proc.returncode == 0
-                output = proc.stdout + proc.stderr
-
-                match = re.search(r'Tests:\s+(\d+) passed', output)
-                if match:
-                    result.passed = int(match.group(1))
-
-                match = re.search(r'(\d+) failed', output)
-                if match:
-                    result.failed = int(match.group(1))
-
-            elif setup['has_pytest']:
-                cmd = ['python', '-m', 'pytest', '--cov', '--cov-report=term'] if with_coverage \
-                    else ['python', '-m', 'pytest', '-v']
-                proc = subprocess.run(
-                    cmd,
-                    cwd=self.project_path,
-                    capture_output=True,
-                    text=True,
-                    timeout=300
-                )
-
-                result.success = proc.returncode == 0
-                output = proc.stdout + proc.stderr
-
-                match = re.search(r'(\d+) passed', output)
-                if match:
-                    result.passed = int(match.group(1))
-
-                match = re.search(r'(\d+) failed', output)
-                if match:
-                    result.failed = int(match.group(1))
-
-                match = re.search(r'TOTAL\s+\d+\s+\d+\s+(\d+)%', output)
-                if match:
-                    result.coverage = float(match.group(1))
-
-            else:
-                # 無測試框架，優雅跳過 (不視為失敗)
-                result.success = True
-                result.not_configured = True
-                result.error = "未設定單元測試框架"
-
-        except subprocess.TimeoutExpired:
-            result.success = False
-            result.error = "測試超時 (5分鐘)"
-        except Exception as e:
-            result.success = False
-            result.error = str(e)
-
-        return result
+        if setup['has_vitest']:
+            from .test_runners.vitest import run_vitest
+            return run_vitest(self.project_path, with_coverage)
+        elif setup['has_jest']:
+            from .test_runners.jest import run_jest
+            return run_jest(self.project_path, with_coverage)
+        elif setup['has_pytest']:
+            from .test_runners.pytest_runner import run_pytest
+            return run_pytest(self.project_path, with_coverage)
+        else:
+            # 無測試框架，優雅跳過 (不視為失敗)
+            result = TestTypeResult(test_type='UIT')
+            result.success = True
+            result.not_configured = True
+            result.error = "未設定單元測試框架"
+            return result
 
     def run_playwright_tests(self, spec_pattern: str, test_type: str, capture_screenshots: bool = True) -> TestTypeResult:
         """執行 Playwright 測試"""
-        result = TestTypeResult(test_type=test_type)
+        from .test_runners.karma import run_playwright_tests
         setup = self.detect_test_setup()
-
-        try:
-            # 檢查是否有 Playwright
-            if not setup['has_playwright']:
-                result.success = True
-                result.not_configured = True
-                result.error = "未安裝 Playwright"
-                return result
-
-            # 檢查是否有對應的測試檔案
-            spec_files = list(self.project_path.glob(f'e2e/{spec_pattern}'))
-            if not spec_files:
-                result.success = True
-                result.not_configured = True
-                result.error = f"未找到 {spec_pattern}"
-                return result
-
-            # 為每個測試類型建立獨立的輸出目錄
-            output_dir = self.project_path / 'test-results' / test_type.lower()
-            output_dir.mkdir(parents=True, exist_ok=True)
-
-            # 使用 JSON reporter 取得詳細結果
-            cmd = [
-                'npx', 'playwright', 'test', f'e2e/{spec_pattern}',
-                '--reporter=json',
-                f'--output={output_dir}'
-            ]
-
-            # 設定環境變數啟用截圖
-            env = dict(subprocess.os.environ)
-            if capture_screenshots:
-                env['SCREENSHOT_ALL'] = '1'
-
-            proc = subprocess.run(
-                cmd,
-                cwd=self.project_path,
-                capture_output=True,
-                text=True,
-                timeout=300,
-                env=env
-            )
-
-            output = proc.stdout + proc.stderr
-            result.success = proc.returncode == 0
-
-            # 嘗試解析 JSON 輸出
-            try:
-                # Playwright JSON 輸出在 stdout
-                json_data = json.loads(proc.stdout)
-
-                # 解析測試案例
-                for suite in json_data.get('suites', []):
-                    self._parse_playwright_suite(suite, result)
-
-                # 計算統計
-                result.passed = sum(1 for tc in result.test_cases if tc.status == 'passed')
-                result.failed = sum(1 for tc in result.test_cases if tc.status == 'failed')
-                result.skipped = sum(1 for tc in result.test_cases if tc.status == 'skipped')
-
-            except json.JSONDecodeError:
-                # 備援：用正則解析
-                # 移除 ANSI 碼
-                ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
-                clean_output = ansi_escape.sub('', output)
-
-                match = re.search(r'(\d+) passed', clean_output)
-                if match:
-                    result.passed = int(match.group(1))
-
-                match = re.search(r'(\d+) failed', clean_output)
-                if match:
-                    result.failed = int(match.group(1))
-
-                # 解析測試名稱 (從輸出中提取)
-                # 格式: [chromium] › e2e/smoke.spec.ts:11:7 › Smoke Tests › SMOKE-01: 應用程式啟動
-                for match in re.finditer(r'› ([^›]+\.spec\.ts:\d+:\d+) › (.+)', clean_output):
-                    test_name = match.group(2).strip()
-                    # 判斷狀態
-                    status = 'passed'
-                    if '✓' in clean_output or 'passed' in clean_output:
-                        status = 'passed'
-                    result.test_cases.append(TestCase(name=test_name, status=status))
-
-            match = re.search(r'\(([\d.]+)s\)', output)
-            if match:
-                result.duration = float(match.group(1))
-
-        except subprocess.TimeoutExpired:
-            result.success = False
-            result.error = "測試超時"
-        except Exception as e:
-            result.success = False
-            result.error = str(e)
-
-        return result
+        return run_playwright_tests(self.project_path, spec_pattern, test_type, setup, capture_screenshots)
 
     def _parse_playwright_suite(self, suite: Dict, result: TestTypeResult, prefix: str = ""):
         """遞迴解析 Playwright 測試套件"""
-        suite_title = suite.get('title', '')
-        current_prefix = f"{prefix} › {suite_title}" if prefix else suite_title
-
-        # 解析 specs (測試案例)
-        for spec in suite.get('specs', []):
-            test_title = spec.get('title', '')
-            full_name = f"{current_prefix} › {test_title}" if current_prefix else test_title
-
-            # 取得測試結果
-            tests = spec.get('tests', [])
-            for test in tests:
-                results_list = test.get('results', [])
-                status = 'passed'
-                duration = 0.0
-                error = ''
-                screenshot = ''
-                api_response = ''
-
-                for res in results_list:
-                    status = res.get('status', 'passed')
-                    duration = res.get('duration', 0) / 1000  # 毫秒轉秒
-                    if res.get('error'):
-                        error = res['error'].get('message', '')[:200]
-
-                    # 取得附件 (截圖或 API 回應)
-                    attachments = res.get('attachments', [])
-                    for att in attachments:
-                        att_name = att.get('name', '')
-                        if att_name == 'screenshot' and att.get('path'):
-                            screenshot = att.get('path', '')
-                        elif att_name == 'api-response' and att.get('body'):
-                            # API 回應是 base64 編碼的 body
-                            import base64
-                            try:
-                                body = att.get('body', '')
-                                if body:
-                                    api_response = base64.b64decode(body).decode('utf-8')
-                            except Exception:
-                                api_response = att.get('body', '')
-
-                result.test_cases.append(TestCase(
-                    name=full_name,
-                    status=status,
-                    duration=duration,
-                    error=error,
-                    screenshot=screenshot,
-                    api_response=api_response
-                ))
-
-        # 遞迴處理子套件
-        for sub_suite in suite.get('suites', []):
-            self._parse_playwright_suite(sub_suite, result, current_prefix)
+        from .test_runners.karma import parse_playwright_suite
+        parse_playwright_suite(suite, result, prefix)
 
     def run_smoke(self) -> TestTypeResult:
         """執行 Smoke 煙霧測試"""
@@ -451,8 +156,6 @@ class TestSuiteRunner:
 
     def run_e2e(self) -> TestTypeResult:
         """執行 E2E 端對端測試"""
-        # 嘗試多種命名模式
-        patterns = ['mes-system.spec.ts', '*.e2e.spec.ts', 'e2e.spec.ts', '!smoke.spec.ts&!uat.spec.ts']
         result = self.run_playwright_tests('mes-system.spec.ts', 'E2E')
         if result.passed == 0 and not result.error:
             result = self.run_playwright_tests('*.e2e.spec.ts', 'E2E')
