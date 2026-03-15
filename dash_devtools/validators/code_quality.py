@@ -12,6 +12,8 @@
 import re
 from pathlib import Path
 
+from .common.constants import SIMPLIFIED_CHINESE as _SIMPLIFIED_CHINESE
+
 
 class CodeQualityValidator:
     """程式碼品質驗證器"""
@@ -21,15 +23,7 @@ class CodeQualityValidator:
     # 設定
     MAX_FILE_LINES = 500
 
-    # 常見簡體字（已排除日文新字体共用漢字：与来会着机当点将学写医）
-    SIMPLIFIED_CHINESE = [
-        '这', '个', '们', '为', '对', '时', '后', '进',
-        '发', '过', '动', '关', '开', '门', '问',
-        '间', '还', '应', '该', '电', '并', '长', '设', '现',
-        '实', '从', '头', '见', '两', '无', '产', '业',
-        '经', '变', '虽', '统', '义', '语', '说', '话', '认', '让',
-        '请', '马', '车', '书', '习', '药', '师'
-    ]
+    SIMPLIFIED_CHINESE = _SIMPLIFIED_CHINESE
 
     # 忽略目錄
     IGNORE_DIRS = [

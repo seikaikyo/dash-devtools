@@ -17,5 +17,5 @@ class UxFixer:
         self.fixes = []
 
     def fix_all(self):
-        """執行所有修復（目前無項目）"""
+        """執行所有修復（目前無待修復項）"""
         return self.fixes

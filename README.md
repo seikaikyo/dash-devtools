@@ -774,6 +774,16 @@ black .
 
 ## 更新歷程
 
+### v2.2 (2026-03-15)
+
+- **大型檔案拆分**: 消除所有超過 500 行的檔案警告
+  - cli.py 1528 → 62 行，拆為 `commands/` 目錄 (10 個模組)
+  - test_suite.py 690 → 393 行，抽出 `test_runners/` (4 個 runner)
+  - word_report.py 689 → 485 行，抽出 `reporters/templates` + `charts`
+  - report.py 667 → 453 行，抽出 `reporters/report_data` + `screenshot`
+  - quality.py 510 → 429 行，詞庫常數抽為 `constants.py`
+- **品質修復**: 中國用語修正、.gitignore 補齊 node_modules
+
 ### v2.1 (2026-03-14)
 
 - **Pre-push Hook v3**: 合併全域版與專案版，動態步驟數
