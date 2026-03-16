@@ -125,18 +125,36 @@ class HealthChecker:
             ('api_key', -15, '發現硬編碼 API Key'),
             ('secret', -10, '發現硬編碼 Secret'),
         ]
+        # 排除 false positive 的 pattern (HTML attribute, 型別宣告, 環境變數讀取)
+        false_positive_patterns = [
+            'type="password"', "type='password'", 'type="password',
+            'os.environ', 'getenv(', 'settings.', 'config.',
+            '# password', '// password', '/* password',
+        ]
 
         for ext in ['*.js', '*.ts', '*.py']:
             for file_path in self.project_path.rglob(ext):
                 if 'node_modules' in str(file_path) or '.git' in str(file_path):
                     continue
+                if 'venv' in str(file_path) or '.venv' in str(file_path):
+                    continue
                 try:
-                    content = file_path.read_text().lower()
+                    content = file_path.read_text()
+                    content_lower = content.lower()
                     for pattern, penalty, message in sensitive_patterns:
-                        if f'{pattern} = "' in content or f"{pattern} = '" in content:
-                            score += penalty
-                            if message not in issues:
-                                issues.append(message)
+                        if f'{pattern} = "' in content_lower or f"{pattern} = '" in content_lower:
+                            # 逐行檢查排除 false positive
+                            is_real = False
+                            for line in content.split('\n'):
+                                line_lower = line.strip().lower()
+                                if f'{pattern} = "' in line_lower or f"{pattern} = '" in line_lower:
+                                    if not any(fp in line_lower for fp in false_positive_patterns):
+                                        is_real = True
+                                        break
+                            if is_real:
+                                score += penalty
+                                if message not in issues:
+                                    issues.append(message)
                 except Exception:
                     pass
 
@@ -192,7 +210,7 @@ class HealthChecker:
         large_files = []
         for ext in ['*.js', '*.ts', '*.py']:
             for file_path in self.project_path.rglob(ext):
-                if 'node_modules' in str(file_path) or '.git' in str(file_path):
+                if any(skip in str(file_path) for skip in ['node_modules', '.git', 'venv', '.venv', 'dist']):
                     continue
                 try:
                     lines = len(file_path.read_text().splitlines())
@@ -254,8 +272,10 @@ class HealthChecker:
             (self.project_path / 'tests').exists(),
             (self.project_path / '__tests__').exists(),
             (self.project_path / 'spec').exists(),
+            (self.project_path / 'backend' / 'tests').exists(),
             any(self.project_path.rglob('*.test.ts')),
             any(self.project_path.rglob('*.spec.ts')),
+            any(self.project_path.rglob('test_*.py')),
         ])
         if not has_tests:
             score -= 15

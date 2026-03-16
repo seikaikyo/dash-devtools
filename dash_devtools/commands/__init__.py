@@ -5,6 +5,7 @@ DashAI DevTools CLI 子指令模組
 """
 
 from . import validate, health, spec, test, deploy, db, ai, hooks, misc
+from . import analyze, generate, api_test
 
 
 def register_all(main):
@@ -18,3 +19,6 @@ def register_all(main):
     ai.register(main)
     hooks.register(main)
     misc.register(main)
+    analyze.register(main)
+    generate.register(main)
+    api_test.register(main)

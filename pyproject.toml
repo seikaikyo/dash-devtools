@@ -49,8 +49,23 @@ report = [
     "matplotlib>=3.8.0",
     "pillow>=10.0",
 ]
+analyze = [
+    "deptry>=0.22",
+    "pip-audit>=2.7",
+    "vulture>=2.11",
+    "radon>=6.0",
+    "pip-licenses>=5.0",
+    "liccheck>=0.9",
+    "dotenv-linter>=0.7",
+]
+api-test = [
+    "schemathesis>=3.36",
+]
+git-analytics = [
+    "gitchangelog>=3.0",
+]
 all = [
-    "dash-devtools[dev,vision,ai,report]",
+    "dash-devtools[dev,vision,ai,report,analyze,api-test,git-analytics]",
 ]
 
 [project.scripts]

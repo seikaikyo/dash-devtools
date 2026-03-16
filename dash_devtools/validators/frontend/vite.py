@@ -121,6 +121,7 @@ class ViteValidator:
         self.check_incomplete_html_tags()
         self.check_empty_buttons()
         self.check_bundle_size()
+        self.check_orphaned_dependencies()
 
         return self.result
 
@@ -435,6 +436,87 @@ class ViteValidator:
             self.result['warnings'].append(f'CSS Bundle 過大: {css_kb:.2f} KB (建議 < 200 KB)')
         if js_kb > 500:
             self.result['warnings'].append(f'JS Bundle 過大: {js_kb:.2f} KB (建議 < 500 KB)')
+
+    def check_orphaned_dependencies(self):
+        """檢查 package.json 中未使用的 dependencies（孤兒依賴）"""
+        pkg_path = self.project_path / 'package.json'
+        if not pkg_path.exists() or not self.src_path.exists():
+            return
+
+        try:
+            pkg = json.loads(pkg_path.read_text(encoding='utf-8'))
+            deps = pkg.get('dependencies', {})
+        except Exception:
+            return
+
+        # 不檢查的套件（框架核心、CSS-only、CLI 工具等，不會被 import）
+        SKIP_PACKAGES = {
+            'vue', 'vue-router', 'pinia', 'vue-i18n',
+            'primeicons',  # CSS-only
+            '@primeuix/themes',  # theme preset, imported in main.ts config
+        }
+
+        # 收集 src/ 下所有 import 語句
+        all_imports = set()
+        for ext in ['*.ts', '*.vue', '*.js', '*.tsx', '*.jsx']:
+            for file_path in self.src_path.rglob(ext):
+                if self._should_skip(file_path):
+                    continue
+                try:
+                    content = file_path.read_text(encoding='utf-8')
+                    # import ... from 'package' or import 'package'
+                    imports = re.findall(
+                        r'''(?:import\s+.*?from\s+|import\s+)['"]([^./][^'"]*?)(?:/[^'"]*)?['"]''',
+                        content
+                    )
+                    all_imports.update(imports)
+                except Exception:
+                    pass
+
+        # 也掃描 main.ts / vite.config.ts 等根目錄設定檔
+        for config_file in ['main.ts', 'main.js', 'vite.config.ts', 'vite.config.js', 'app.ts']:
+            cfg_path = self.project_path / config_file
+            if not cfg_path.exists():
+                cfg_path = self.src_path / config_file
+            if cfg_path.exists():
+                try:
+                    content = cfg_path.read_text(encoding='utf-8')
+                    imports = re.findall(
+                        r'''(?:import\s+.*?from\s+|import\s+)['"]([^./][^'"]*?)(?:/[^'"]*)?['"]''',
+                        content
+                    )
+                    all_imports.update(imports)
+                except Exception:
+                    pass
+
+        orphaned = []
+        for dep_name in deps:
+            if dep_name in SKIP_PACKAGES:
+                continue
+            # 檢查是否有任何 import 引用此套件（含 scoped package）
+            # e.g. @clerk/vue → check '@clerk/vue' or '@clerk'
+            found = False
+            for imp in all_imports:
+                if imp == dep_name or imp.startswith(dep_name + '/'):
+                    found = True
+                    break
+                # scoped package: @scope/pkg → import from '@scope/pkg/sub'
+                if dep_name.startswith('@') and imp.startswith(dep_name.split('/')[0]):
+                    if imp == dep_name or imp.startswith(dep_name):
+                        found = True
+                        break
+            if not found:
+                orphaned.append(dep_name)
+
+        self.result['checks']['orphaned_dependencies'] = {
+            'count': len(orphaned),
+            'packages': orphaned
+        }
+
+        if orphaned:
+            self.result['warnings'].append(
+                f"孤兒依賴（package.json 有但 src/ 未 import）: {', '.join(orphaned)}"
+            )
 
     def _parse_scanignore(self):
         """解析 .scanignore 檔案"""
