@@ -183,6 +183,24 @@ else
     echo ""
 fi
 
+# 步驟 5: 架構文件檢查 (警告，不阻擋)
+echo "[>] 步驟 5: 架構文件檢查..."
+ARCH_WARN=0
+if [ ! -f "$PROJECT_ROOT/CLAUDE.md" ]; then
+    echo "   [!] CLAUDE.md 不存在，建議建立"
+    ARCH_WARN=1
+fi
+if [ "$IS_FRONTEND" = true ]; then
+    if [ ! -f "$PROJECT_ROOT/.interface-design/system.md" ] && [ ! -f "$PROJECT_ROOT/frontend/.interface-design/system.md" ]; then
+        echo "   [!] Design System 不存在，建議跑 /interface-design:extract"
+        ARCH_WARN=1
+    fi
+fi
+if [ $ARCH_WARN -eq 0 ]; then
+    echo "   [v] 架構文件完整"
+fi
+echo ""
+
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "[v] 所有檢查通過，繼續推送..."
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
