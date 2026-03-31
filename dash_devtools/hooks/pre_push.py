@@ -136,7 +136,8 @@ def run_ggshield_scan(project_path):
         result = subprocess.run(
             ['ggshield', '--version'],
             capture_output=True,
-            text=True
+            text=True,
+            stdin=subprocess.DEVNULL
         )
         if result.returncode != 0:
             return None
@@ -151,6 +152,7 @@ def run_ggshield_scan(project_path):
              '--ignore-path', '.env.local'],
             capture_output=True,
             text=True,
+            stdin=subprocess.DEVNULL,
             cwd=project_path
         )
 
