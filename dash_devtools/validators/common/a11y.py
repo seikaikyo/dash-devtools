@@ -50,21 +50,22 @@ class A11yValidator:
 
     def _check_icon_buttons(self, files):
         """檢查 icon-only 按鈕是否有 aria-label"""
-        # 匹配 <button> 或 <Button> 含 icon 但疑似無文字
+        # 只匹配明確的 size="icon" 按鈕（真正的 icon-only）
         icon_button_pattern = re.compile(
-            r'<(?:button|Button)\b[^>]*(?:size=["\']icon["\']|variant=["\']ghost["\'])[^>]*>'
+            r"""<(?:button|Button)\b[^>]*size\s*=\s*['"]icon['"][^>]*>"""
         )
-        aria_label_pattern = re.compile(r'aria-label\s*[={]')
+        accessible_pattern = re.compile(r'aria-label\s*[={]|sr-only')
         issues = []
 
         for f in files:
             content = f.read_text(encoding='utf-8', errors='ignore')
-            for i, line in enumerate(content.split('\n'), 1):
+            lines = content.split('\n')
+            for i, line in enumerate(lines, 1):
                 if icon_button_pattern.search(line):
-                    # 檢查同一行或前後幾行是否有 aria-label
-                    context = content.split('\n')[max(0, i - 2):i + 2]
+                    # 檢查前後 4 行是否有 aria-label 或 sr-only
+                    context = lines[max(0, i - 2):i + 4]
                     context_str = ' '.join(context)
-                    if not aria_label_pattern.search(context_str):
+                    if not accessible_pattern.search(context_str):
                         rel = f.relative_to(self.project_path)
                         issues.append(f'{rel}:{i}')
 
