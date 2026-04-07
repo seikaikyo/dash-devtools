@@ -124,6 +124,14 @@ class ProjectDetector:
                     'has_tailwind': 'tailwindcss' in deps
                 }
 
+            # Next.js 偵測（優先於純 React）
+            if 'next' in deps:
+                return {
+                    'type': 'nextjs',
+                    'version': deps.get('next', 'unknown'),
+                    'ui_framework': self._detect_react_ui(deps),
+                }
+
             # React 偵測
             if 'react' in deps:
                 return {
@@ -344,6 +352,8 @@ class ProjectDetector:
             validators.add('frontend.angular')
         elif frontend_type in ['vite', 'vanilla', 'vue-vite', 'vue']:
             validators.add('frontend.vite')
+        elif frontend_type == 'nextjs':
+            validators.add('frontend.nextjs')
         elif frontend_type == 'react':
             validators.add('frontend.react')
 

@@ -13,8 +13,8 @@
 
 from pathlib import Path
 from .detector import ProjectDetector
-from .common import SecurityValidator, QualityValidator, SpecValidator
-from .frontend import ViteValidator, AngularValidator, GasValidator
+from .common import SecurityValidator, QualityValidator, SpecValidator, I18nSyncValidator, A11yValidator
+from .frontend import ViteValidator, AngularValidator, GasValidator, NextjsValidator
 from .backend import NodejsValidator, PythonValidator
 
 # 保留舊的匯入（向後相容）
@@ -29,7 +29,10 @@ __all__ = [
     'SecurityValidator',
     'QualityValidator',
     'SpecValidator',
+    'I18nSyncValidator',
+    'A11yValidator',
     'ViteValidator',
+    'NextjsValidator',
     'AngularValidator',
     'GasValidator',
     'NodejsValidator',
@@ -73,6 +76,16 @@ def run_smart_validation(projects, output=None):
         validators.append(SecurityValidator(project_path))
         validators.append(QualityValidator(project_path))
 
+        # i18n 同步驗證器（有 locale 目錄就跑）
+        locale_dirs = ['src/locales', 'src/i18n', 'locales', 'i18n']
+        if any((project_path / d).exists() for d in locale_dirs):
+            validators.append(I18nSyncValidator(project_path))
+
+        # A11Y 驗證器（有 tsx/jsx 就跑）
+        has_tsx = any(project_path.rglob('*.tsx')) or any(project_path.rglob('*.jsx'))
+        if has_tsx:
+            validators.append(A11yValidator(project_path))
+
         # OpenSpec 驗證器（如果有 openspec/ 目錄）
         openspec_dir = project_path / 'openspec'
         if openspec_dir.exists():
@@ -85,6 +98,8 @@ def run_smart_validation(projects, output=None):
             validators.append(AngularValidator(project_path))
         elif project_info['frontend'] in ['vite', 'vanilla']:
             validators.append(ViteValidator(project_path))
+        elif project_info['frontend'] == 'nextjs':
+            validators.append(NextjsValidator(project_path))
 
         # 後端驗證器
         if project_info['backend'] == 'nodejs':

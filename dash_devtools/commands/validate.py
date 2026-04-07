@@ -71,6 +71,14 @@ def validate(project, validate_all, check, fix, output):
             for e in r.get('errors', []):
                 console.print(f"    [red]• {e}[/red]")
 
+    if has_warnings:
+        console.print("\n[yellow]警告詳情：[/yellow]")
+        for r in results:
+            if r.get('warnings'):
+                console.print(f"  [cyan]{r['project']}[/cyan]")
+                for w in r['warnings']:
+                    console.print(f"    [yellow]• {w}[/yellow]")
+
     # 顯示修復提示
     if not fix and (failed or has_warnings):
         console.print("\n[yellow]━━━ 修復提示 ━━━[/yellow]")
