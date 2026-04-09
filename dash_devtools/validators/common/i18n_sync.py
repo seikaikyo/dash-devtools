@@ -11,6 +11,8 @@ import re
 import json
 from pathlib import Path
 
+from .constants import BANNED_CONCEPTS
+
 
 class I18nSyncValidator:
     """i18n key 同步驗證器"""
@@ -31,19 +33,19 @@ class I18nSyncValidator:
 
     def run(self):
         locale_dir = self._find_locale_dir()
-        if not locale_dir:
-            return self.result
+        locale_files = {}
 
-        locale_files = self._find_locale_files(locale_dir)
-        if len(locale_files) < 2:
-            return self.result
+        if locale_dir:
+            locale_files = self._find_locale_files(locale_dir)
+            if len(locale_files) >= 2:
+                all_keys = {}
+                for name, file_path in locale_files.items():
+                    keys = self._extract_keys(file_path)
+                    all_keys[name] = keys
+                self._check_sync(all_keys)
 
-        all_keys = {}
-        for name, file_path in locale_files.items():
-            keys = self._extract_keys(file_path)
-            all_keys[name] = keys
-
-        self._check_sync(all_keys)
+        # 禁用概念掃描：不管有沒有 locale dir 都跑（也掃 data/ JSON）
+        self._check_banned_concepts(locale_files)
         return self.result
 
     def _find_locale_dir(self):
@@ -169,3 +171,32 @@ class I18nSyncValidator:
                 self.result['warnings'].append(
                     f'{locale} 缺少 {count} 個 key（如 {sample}）'
                 )
+
+    def _check_banned_concepts(self, locale_files):
+        """掃描 i18n 值中是否包含已移除概念（傍通曆、五行、暦注等）"""
+        # 同時掃描 data/ 目錄下的 JSON
+        scan_files = dict(locale_files)
+        data_dir = self.project_path / 'data'
+        if data_dir.exists():
+            for f in data_dir.rglob('*.json'):
+                scan_files[f'data/{f.name}'] = f
+
+        hits = []
+        for name, file_path in scan_files.items():
+            try:
+                content = file_path.read_text(encoding='utf-8', errors='ignore')
+            except Exception:
+                continue
+            for term, reason in BANNED_CONCEPTS.items():
+                # 逐行掃描，跳過註解行
+                for lineno, line in enumerate(content.split('\n'), 1):
+                    stripped = line.strip()
+                    if stripped.startswith('//') or stripped.startswith('#') or stripped.startswith('*'):
+                        continue
+                    if term in line:
+                        hits.append(f'{name}:{lineno} 含已移除概念「{term}」（{reason}）')
+
+        if hits:
+            self.result['passed'] = False
+            for hit in hits[:10]:
+                self.result['errors'].append(hit)
