@@ -18,15 +18,16 @@ class SecurityValidator:
     name = 'security'
 
     # 敏感資料正則表達式
+    # 要求 value 必須在 quote 內，避免把 `token = func_call()` 這類函式呼叫誤判
     SENSITIVE_PATTERNS = [
-        (r'(?i)(api[_-]?key|apikey)\s*[=:]\s*["\']?[a-zA-Z0-9_-]{20,}', 'API Key'),
-        (r'(?i)(secret|token)\s*[=:]\s*["\']?[a-zA-Z0-9_-]{20,}', 'Secret/Token'),
+        (r'(?i)(api[_-]?key|apikey)\s*[=:]\s*["\'][a-zA-Z0-9_=/+\-]{20,}["\']', 'API Key'),
+        (r'(?i)(secret|token)\s*[=:]\s*["\'][a-zA-Z0-9_=/+\-]{20,}["\']', 'Secret/Token'),
         (r'(?i)password\s*[=:]\s*["\'][^"\']+["\']', '密碼'),
         (r'sk-[a-zA-Z0-9]{48}', 'OpenAI API Key'),
         (r'sk_live_[a-zA-Z0-9]{24,}', 'Stripe Live Key'),
         (r'ghp_[a-zA-Z0-9]{36}', 'GitHub Token'),
         # Clerk 只檢查 secret key (sk_)，publishable key (pk_) 是公開的
-        (r'CLERK_SECRET_KEY\s*=\s*["\']?sk_[a-zA-Z0-9_-]{20,}', 'Clerk Secret Key'),
+        (r'CLERK_SECRET_KEY\s*=\s*["\']sk_[a-zA-Z0-9_-]{20,}["\']', 'Clerk Secret Key'),
     ]
 
     # 敏感檔案
@@ -40,10 +41,11 @@ class SecurityValidator:
         '*.pem',
     ]
 
-    # 忽略目錄
+    # 忽略目錄（含 tests / __tests__ — 測試 fixture 常用 fake secret，會誤判）
     IGNORE_DIRS = [
         'node_modules', '.git', 'dist', 'build', '.next', '__pycache__',
-        '.angular', 'venv', '.venv', '.cache', 'coverage'
+        '.angular', 'venv', '.venv', '.cache', 'coverage',
+        'tests', '__tests__', 'test', 'spec', '__specs__',
     ]
 
     def __init__(self, project_path):

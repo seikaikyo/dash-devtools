@@ -197,10 +197,11 @@ def run_pre_push_check(project_path):
     # 備援：使用本地正則表達式
     issues = []
 
-    # 忽略的目錄和檔案
+    # 忽略的目錄和檔案（含 tests / __tests__ — 測試 fixture 常用 fake secret，會誤判）
     ignore_dirs = [
         'node_modules', '.git', 'dist', 'build', '.next', '__pycache__',
-        'venv', '.venv', '.angular', '.cache', 'coverage'
+        'venv', '.venv', '.angular', '.cache', 'coverage',
+        'tests', '__tests__', 'test', 'spec', '__specs__',
     ]
     ignore_files = ['.env.example', '.env.sample', '.env.template']
 
