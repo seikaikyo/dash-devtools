@@ -11,7 +11,7 @@ import re
 import json
 from pathlib import Path
 
-from .constants import BANNED_CONCEPTS
+from .constants import BANNED_CONCEPTS, BANNED_CONCEPTS_ALLOWLIST_PREFIXES
 
 
 class I18nSyncValidator:
@@ -183,6 +183,9 @@ class I18nSyncValidator:
 
         hits = []
         for name, file_path in scan_files.items():
+            # 白名單豁免：對比說明 / glossary 教育性條目允許引用 BANNED_CONCEPTS
+            if any(name.startswith(p) for p in BANNED_CONCEPTS_ALLOWLIST_PREFIXES):
+                continue
             try:
                 content = file_path.read_text(encoding='utf-8', errors='ignore')
             except Exception:

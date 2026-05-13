@@ -120,3 +120,10 @@ BANNED_CONCEPTS = {
     'lucky_items': '假敘事，已清除',
     'rokugai': '假敘事，已清除',
 }
+
+# 已移除概念白名單：相對路徑符合任一 prefix 的檔案豁免 BANNED_CONCEPTS 掃描
+# 這類檔案的目的就是解釋「為什麼不用 X」「跟 X 的區別」，引用屬合規教育用途而非殘留誤用
+# 比對方式：startswith 前綴比對，自動涵蓋同前綴的多語版本（_ja / _en / _zh / 預設等）
+BANNED_CONCEPTS_ALLOWLIST_PREFIXES = (
+    'data/knowledge_',
+)
