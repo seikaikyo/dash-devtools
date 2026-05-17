@@ -170,8 +170,17 @@ class NodejsValidator:
         issues = []
         protected_count = 0
 
-        # 檢查是否使用 withApiAuth
-        auth_pattern = r'withApiAuth'
+        # 偵測各種認證 pattern（Clerk legacy + Logto + 通用 helper）
+        auth_patterns = [
+            'withApiAuth',           # Clerk legacy
+            'verifyLogtoJWT',        # Logto JWT 中間件
+            'getLogtoAccessToken',   # Logto access token helper
+            'requireAuth',           # 通用 helper（jose / passport / lucia 等）
+            'event.context.user',    # Nuxt server context 直取 user
+            'requireUserSession',    # sidebase nuxt-auth
+        ]
+        # 刻意公開的 proxy 用註解標示
+        public_proxy_pattern = '@public-proxy'
 
         for file_path in self.api_path.rglob('*.js'):
             if self._should_skip(file_path):
@@ -180,18 +189,22 @@ class NodejsValidator:
                 content = file_path.read_text(encoding='utf-8')
                 rel_path = str(file_path.relative_to(self.project_path))
 
-                has_auth = auth_pattern in content
+                has_auth = any(p in content for p in auth_patterns)
+                is_public_proxy = public_proxy_pattern in content
 
                 # 判斷是否為需要認證的 API
-                is_public = any(pub in rel_path for pub in ['health', 'public', 'webhook'])
+                is_public_by_path = any(pub in rel_path for pub in ['health', 'public', 'webhook'])
 
                 if has_auth:
                     protected_count += 1
-                elif not is_public:
-                    # 非公開 API 但沒有認證
+                elif is_public_proxy or is_public_by_path:
+                    # 刻意 public，不算 issue
+                    continue
+                else:
+                    # 非公開 API 但沒偵測到任何認證 pattern
                     issues.append({
                         'file': rel_path,
-                        'issue': '可能缺少認證保護 (withApiAuth)'
+                        'issue': '可能缺少認證保護（未偵測到 Logto/Clerk/通用認證 pattern；若為刻意 public 請加 @public-proxy 註解）'
                     })
 
             except Exception:

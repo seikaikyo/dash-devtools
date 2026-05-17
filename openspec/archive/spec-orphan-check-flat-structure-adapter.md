@@ -1,8 +1,9 @@
 ---
 title: spec orphan check 支援 flat OpenSpec 結構
 type: refactor
-status: proposal
+status: completed
 created: 2026-05-17
+completed: 2026-05-17
 ---
 
 # spec orphan check 支援 flat OpenSpec 結構

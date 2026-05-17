@@ -224,8 +224,18 @@ class SpecValidator:
             except Exception:
                 pass
 
-        # 檢查 changes 目錄中的檔案
         existing_changes = {f.stem for f in changes_dir.glob('*.md')}
+
+        # specs 內完全沒有 [[]] 引用 → 視為 flat 結構，跳過 orphan check
+        # opt-in 機制：repo 加入第一個 [[ref]] 即自動啟動階層模式
+        if not referenced_changes:
+            self.result['checks']['consistency'] = {
+                'specs_count': len(list(specs_dir.glob('*.md'))),
+                'changes_count': len(existing_changes),
+                'orphan_changes': [],
+                'note': 'flat structure detected (specs 內無 [[]] 引用)，略過 orphan check'
+            }
+            return
 
         # 找出孤立的變更（在 changes/ 但沒被任何 spec 參照）
         orphan_changes = existing_changes - referenced_changes

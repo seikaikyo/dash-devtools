@@ -1,8 +1,9 @@
 ---
 title: Node.js auth validator 加 Logto pattern + public-proxy 白名單
 type: refactor
-status: proposal
+status: completed
 created: 2026-05-17
+completed: 2026-05-17
 ---
 
 # Node.js auth validator 加 Logto pattern + public-proxy 白名單
