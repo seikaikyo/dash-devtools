@@ -292,6 +292,18 @@ PyPIに公開。これ以降、READMEの更新履歴とパッケージバージ�
 - **オープンソースツール統合**: 9個のOSSツールを統合、healthスコアの精緻化
 - **品質・セキュリティ修正**: a11y精度向上 (テキストやsr-onlyを持つボタンを除外)、regex厳格化とtestディレクトリのスキップで誤検出削減、knowledge_ JSONファイルをallowlist化、ggshield stdin pipe修正、verifyコマンド追加
 
+### v2.2 (2026-03-15)
+
+- **大型ファイル分割**: 500行を超えるファイルの警告をすべて解消
+  - cli.py 1528 → 62行、`commands/`ディレクトリに分割 (10モジュール)
+  - test_suite.py 690 → 393行、`test_runners/`を抽出 (4 runner)
+  - word_report.py 689 → 485行、`reporters/templates` + `charts`を抽出
+  - report.py 667 → 453行、`reporters/report_data` + `screenshot`を抽出
+  - quality.py 510 → 429行、用語定数を`constants.py`に抽出
+  - browser.py 541 → 354行、便利関数を`browser_helpers.py`に移動
+- **品質修正**: 中国大陸用語の修正、.gitignoreにnode_modules補完
+- **dash validate でエラー0・警告0を達成**
+
 ### v2.1 (2026-03-14)
 
 - **Pre-push Hook v3**: グローバル版とプロジェクト版を統合、動的ステップ数

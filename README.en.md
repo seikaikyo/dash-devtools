@@ -292,6 +292,18 @@ Published to PyPI; from this point the README changelog and the package version 
 - **Open-source tool integration**: integrates 9 open-source tools, refined health scoring
 - **Quality and security fixes**: improved a11y precision (excludes buttons with text or sr-only), tighter regex skipping test dirs to cut false positives, knowledge_ JSON files allowlisted, ggshield stdin pipe fix, new verify command
 
+### v2.2 (2026-03-15)
+
+- **Large-file split**: eliminated all warnings for files over 500 lines
+  - cli.py 1528 → 62 lines, split into a `commands/` directory (10 modules)
+  - test_suite.py 690 → 393 lines, extracted `test_runners/` (4 runners)
+  - word_report.py 689 → 485 lines, extracted `reporters/templates` + `charts`
+  - report.py 667 → 453 lines, extracted `reporters/report_data` + `screenshot`
+  - quality.py 510 → 429 lines, term constants moved to `constants.py`
+  - browser.py 541 → 354 lines, helper functions moved to `browser_helpers.py`
+- **Quality fixes**: China-specific term corrections, .gitignore node_modules
+- **dash validate reaches 0 errors, 0 warnings**
+
 ### v2.1 (2026-03-14)
 
 - **Pre-push Hook v3**: Merged global and project hooks, dynamic step count
