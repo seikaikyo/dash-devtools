@@ -41,7 +41,7 @@ DEFAULT_PROJECTS = [str(GITHUB_BASE / name) for name in DEFAULT_PROJECT_NAMES]
 
 
 @click.group()
-@click.version_option(version="2.0.0")
+@click.version_option(version="2.0.1")
 def main():
     """DashAI DevTools v2 - 大許開發工具集
 
