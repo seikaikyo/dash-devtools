@@ -774,6 +774,18 @@ black .
 
 ## 更新歷程
 
+### v2.0.0 (2026-05-20)
+
+發布至 PyPI，自此 README 歷程與套件版本號統一。彙整 v2.2 (2026-03-15) 之後至 2026-05-17 的改動。
+
+- **語意層驗證器**: 新增 4 個語意層驗證器 (Next.js SEO 與安全標頭、i18n key 一致性、a11y)，警告顯示細節
+- **Logto 認證 pattern 驗證**: 認 Logto / Clerk 與通用共 6 種 pattern，public proxy 以 @public-proxy 註解標示
+- **Flat OpenSpec adapter**: 扁平 OpenSpec 自動跳過 orphan check (specs 以 [[ref]] opt-in)
+- **禁用概念掃描**: 自動攔截已移除概念 (傍通曆、五行、暦注、六害宿等)
+- **架構文件完整性**: 新增 dash architecture check/diff 指令，pre-push 步驟 5 架構檢查
+- **開源工具整合**: 整合 9 個開源工具，health 評分精準化
+- **品質與安全修復**: a11y 精準度提升 (排除有文字或 sr-only 的按鈕)、regex 收斂並跳過 test 目錄降低假陽性、knowledge_ JSON 檔加入 allowlist、ggshield stdin pipe 修正、新增 verify 指令
+
 ### v2.2 (2026-03-15)
 
 - **大型檔案拆分**: 消除所有超過 500 行的檔案警告

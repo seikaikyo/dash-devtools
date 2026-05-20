@@ -280,6 +280,18 @@ black .
 
 ## 更新履歴
 
+### v2.0.0 (2026-05-20)
+
+PyPIに公開。これ以降、READMEの更新履歴とパッケージバージョンを統一。v2.2 (2026-03-15) 以降〜2026-05-17の変更をまとめる。
+
+- **セマンティック検証器**: 4種のセマンティック層検証器を追加 (Next.js SEO・セキュリティヘッダー、i18nキー整合性、a11y)、警告の詳細表示
+- **Logto認証パターン検証**: Logto / Clerkと汎用6種のパターンを認識、public proxyは@public-proxy注釈で明示
+- **Flat OpenSpecアダプター**: フラットなOpenSpecはorphanチェックを自動スキップ (specsは[[ref]]でopt-in)
+- **禁止概念スキャン**: 削除済み概念 (傍通暦・五行・暦注・六害宿など) を自動ブロック
+- **アーキテクチャ文書の完全性**: dash architecture check/diffコマンドを追加、pre-push手順5にアーキテクチャチェック
+- **オープンソースツール統合**: 9個のOSSツールを統合、healthスコアの精緻化
+- **品質・セキュリティ修正**: a11y精度向上 (テキストやsr-onlyを持つボタンを除外)、regex厳格化とtestディレクトリのスキップで誤検出削減、knowledge_ JSONファイルをallowlist化、ggshield stdin pipe修正、verifyコマンド追加
+
 ### v2.1 (2026-03-14)
 
 - **Pre-push Hook v3**: グローバル版とプロジェクト版を統合、動的ステップ数

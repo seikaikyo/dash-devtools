@@ -280,6 +280,18 @@ This project uses the following open-source tools:
 
 ## Changelog
 
+### v2.0.0 (2026-05-20)
+
+Published to PyPI; from this point the README changelog and the package version are unified. Consolidates the changes after v2.2 (2026-03-15) through 2026-05-17.
+
+- **Semantic validators**: 4 new semantic-layer validators (Next.js SEO and security headers, i18n key consistency, a11y), with detailed warning output
+- **Logto auth pattern validation**: recognizes Logto / Clerk and 6 generic patterns; public proxies marked with an @public-proxy annotation
+- **Flat OpenSpec adapter**: flat OpenSpec layouts skip the orphan check automatically (specs opt in via [[ref]])
+- **Banned-concept scan**: auto-blocks removed concepts (boutsuureki, wuxing, koyomi-chu, rokugai-shuku, etc.)
+- **Architecture doc integrity**: new dash architecture check/diff command, plus a pre-push step 5 architecture check
+- **Open-source tool integration**: integrates 9 open-source tools, refined health scoring
+- **Quality and security fixes**: improved a11y precision (excludes buttons with text or sr-only), tighter regex skipping test dirs to cut false positives, knowledge_ JSON files allowlisted, ggshield stdin pipe fix, new verify command
+
 ### v2.1 (2026-03-14)
 
 - **Pre-push Hook v3**: Merged global and project hooks, dynamic step count
