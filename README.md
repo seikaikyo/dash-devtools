@@ -1,4 +1,4 @@
-# DashAI DevTools v2.1
+# DashAI DevTools v2.0.1
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
@@ -18,7 +18,22 @@
 
 ```bash
 cd dash-devtools
+
+# 建議用 uv（與專案環境規範一致）
+uv pip install -e .
+
+# 或使用 pip
 pip install -e .
+```
+
+選用功能依賴可分組安裝（見 `pyproject.toml`）：
+
+```bash
+uv pip install -e ".[ai]"        # Gemini AI 分析
+uv pip install -e ".[vision]"    # 視覺分析 (OpenCV/Pillow)
+uv pip install -e ".[analyze]"   # 死碼/複雜度/授權掃描
+uv pip install -e ".[report]"    # Word/圖表報告
+uv pip install -e ".[all]"       # 全部
 ```
 
 ## 工具總覽
@@ -30,10 +45,14 @@ pip install -e .
 | **規格** | `dash spec` | OpenSpec 規格驅動開發 (SDD) |
 | **統計** | `dash stats` | 程式碼統計儀表板 |
 | **測試** | `dash test` | 執行測試 (vitest/jest/pytest) |
+| **測試** | `dash init-test` | 產生測試骨架 |
 | **測試套件** | `dash test-suite` | 四大類測試 (UIT/Smoke/E2E/UAT) + 報告 |
+| **測試套件** | `dash gas-test` | Google Apps Script 測試套件 |
 | **E2E** | `dash e2e` | E2E 煙霧測試 (agent-browser) |
+| **效能** | `dash perf` | Lighthouse 效能分析 |
 | **報告** | `dash report` | 產生完整 HTML 報告 |
 | **監控** | `dash watch` | 即時監控模式 |
+| **監控** | `dash monitor` | UptimeRobot 監控管理 |
 | **掃描** | `dash scan` | 掃描機敏資料 |
 | **AI** | `dash ai` | AI 程式碼助手 (Gemini) |
 | **資料庫** | `dash db` | 資料庫遷移管理 (Alembic) |
@@ -41,6 +60,19 @@ pip install -e .
 | **文件** | `dash docs` | 產生文件、CLAUDE.md |
 | **視覺** | `dash vision` | AI 視覺分析工具 |
 | **診斷** | `dash doctor` | 診斷開發環境 |
+| **依賴** | `dash deps check` / `deps audit` | 依賴未用 / 漏洞掃描 (deptry / pip-audit) |
+| **死碼** | `dash deadcode` | 偵測未使用程式碼 (vulture) |
+| **複雜度** | `dash complexity` | 圈複雜度 / 認知複雜度 (radon) |
+| **授權** | `dash licenses list` / `licenses check` | 列出 / 檢查相依套件授權 |
+| **環境** | `dash env-lint` | .env 檔案檢查 (dotenv-linter) |
+| **API 測試** | `dash api-test` | API 端點測試 (schemathesis) |
+| **架構** | `dash architecture` | CLAUDE.md 架構文件一致性檢查 |
+| **驗證部署** | `dash verify` | 部署後一條龍驗證 |
+| **變更日誌** | `dash changelog` | 產生 changelog (gitchangelog) |
+| **Git 統計** | `dash git-stats` | Git 貢獻者統計 |
+| **Bundle** | `dash bundle` | 前端 bundle 大小分析 |
+| **遷移** | `dash migrate` | UI 框架遷移（已暫停） |
+| **發布** | `dash release` | 版本發布管理 |
 
 ## 快速使用
 
