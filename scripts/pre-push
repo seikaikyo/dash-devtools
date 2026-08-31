@@ -24,6 +24,11 @@ if [ ! -x "$DASH_CMD" ]; then
     fi
 fi
 
+# ── 暫存檔（mktemp 隨機路徑，避免固定可猜路徑被搶先建立或竄改）──
+TMP_EMOJI="$(mktemp "${TMPDIR:-/tmp}/dash_hook.XXXXXXXX")" || exit 1
+TMP_COMMIT="$(mktemp "${TMPDIR:-/tmp}/dash_commit.XXXXXXXX")" || exit 1
+trap 'rm -f "$TMP_EMOJI" "$TMP_COMMIT"' EXIT
+
 # ── 專案類型偵測 ──
 IS_FRONTEND=false
 IS_TYPESCRIPT=false
@@ -101,15 +106,26 @@ if [ -n "$CHANGED_FILES" ]; then
     echo "$CHANGED_FILES" | grep -E '\.(js|ts|jsx|tsx|vue|html|css|py|md|json)$' | while read -r file; do
         filepath="$PROJECT_ROOT/$file"
         [ -f "$filepath" ] || continue
-        if grep -lP '[\x{1F300}-\x{1F9FF}\x{2600}-\x{27BF}\x{FE00}-\x{FE0F}\x{1F1E0}-\x{1F1FF}]' "$filepath" >/dev/null 2>&1; then
+        # 原本用 grep -lP，但 macOS 內建的 BSD grep 不支援 -P，錯誤被
+        # 2>/dev/null 吞掉後條件恆為假，這一步從來沒有真的檢查過。
+        # 改用 python3（本專案本來就依賴 Python），行為跨平台一致。
+        if python3 -c '
+import sys
+RANGES = ((0x1F300, 0x1F9FF), (0x2600, 0x27BF), (0xFE00, 0xFE0F), (0x1F1E0, 0x1F1FF))
+try:
+    text = open(sys.argv[1], encoding="utf-8", errors="ignore").read()
+except OSError:
+    sys.exit(1)
+sys.exit(0 if any(lo <= ord(c) <= hi for c in text for lo, hi in RANGES) else 1)
+' "$filepath" 2>/dev/null; then
             echo "   [x] $file"
-            echo "EMOJI_FAIL" >> /tmp/dash_hook_$$
+            echo "EMOJI_FAIL" >> "$TMP_EMOJI"
         fi
     done
 fi
 
-if [ -f /tmp/dash_hook_$$ ]; then
-    rm -f /tmp/dash_hook_$$
+# mktemp 先建好空檔，改以「有內容」判定
+if [ -s "$TMP_EMOJI" ]; then
     echo ""
     echo "[x] 請移除 emoji（使用 PrimeIcons 或 SVG 替代）"
     ERRORS=$((ERRORS + 1))
@@ -141,7 +157,7 @@ while read -r local_ref local_sha remote_ref remote_sha 2>/dev/null; do
         # 禁止 Emoji
         if echo "$subject" | grep -qP '[\x{1F300}-\x{1F9FF}\x{2600}-\x{27BF}]' 2>/dev/null; then
             echo "   [x] $hash: commit message 含 Emoji"
-            echo "FAIL" >> /tmp/dash_commit_$$
+            echo "FAIL" >> "$TMP_COMMIT"
         fi
 
         # 格式建議（不阻擋，僅提示）
@@ -153,8 +169,7 @@ while read -r local_ref local_sha remote_ref remote_sha 2>/dev/null; do
     done
 done
 
-if [ -f /tmp/dash_commit_$$ ]; then
-    rm -f /tmp/dash_commit_$$
+if [ -s "$TMP_COMMIT" ]; then
     echo "[x] commit message 含禁用字元！"
     ERRORS=$((ERRORS + 1))
 else

@@ -244,6 +244,22 @@ chmod +x ~/.config/git/hooks/pre-push
 
 エラーはプッシュをブロック、警告は通知のみ。各ステップに経過時間を表示。
 
+### スキャン範囲
+
+`GITGUARDIAN_API_KEY` を設定していない場合、実際にプッシュを止めているのはローカルルールです。
+除外ルールは部分文字列ではなくパス要素で照合します。`node_modules/` `dist/` `tests/` はスキップし、
+パスにその文字列を含むだけの通常のソース（`src/api/distributor.ts`、`src/lib/latest.ts`）はスキャンします。
+`.gitignore` は gitignore の意味論（ディレクトリ規則、ルート固定、`!` 否定）で照合するため、
+`logs` の行が `src/logs_helper.ts` を巻き添えでスキップすることはありません。
+誤検知は `.scanignore` で除外してください。
+
+### スクリーンショットのサンドボックス
+
+`scripts/screenshot.js` は任意の URL を開いてページの JavaScript を実行するため、
+Chrome のサンドボックスが主要な分離境界であり、既定で有効です。
+コンテナ内でどうしても有効にできない場合のみ `DASH_SCREENSHOT_NO_SANDBOX=1` で明示的に無効化してください。
+無効化するとページの脆弱性が実行アカウントに直接届きます。
+
 ## Claude Code統合
 
 ### Skillインストール

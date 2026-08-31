@@ -356,17 +356,20 @@ def take_screenshots(project_path: str, urls: List[str] = None) -> List[str]:
     # Puppeteer 截圖腳本
     for i, url in enumerate(urls):
         screenshot_path = screenshot_dir / f'screenshot-{i+1}.png'
-        script = f'''
+        # url 與輸出路徑走 process.argv 傳入，腳本內不做字串插值
+        script = '''
 const puppeteer = require("puppeteer");
-(async () => {{
-  const browser = await puppeteer.launch({{ headless: "new" }});
+const targetUrl = process.argv[1];
+const outputPath = process.argv[2];
+(async () => {
+  const browser = await puppeteer.launch({ headless: "new" });
   const page = await browser.newPage();
-  await page.setViewport({{ width: 1920, height: 1080 }});
-  await page.goto("{url}", {{ waitUntil: "networkidle0", timeout: 30000 }});
+  await page.setViewport({ width: 1920, height: 1080 });
+  await page.goto(targetUrl, { waitUntil: "networkidle0", timeout: 30000 });
   await new Promise(r => setTimeout(r, 2000));
-  await page.screenshot({{ path: "{screenshot_path}", fullPage: false }});
+  await page.screenshot({ path: outputPath, fullPage: false });
   await browser.close();
-}})();
+})();
 '''
         try:
             puppeteer_dirs = [
@@ -376,7 +379,7 @@ const puppeteer = require("puppeteer");
             for pdir in puppeteer_dirs:
                 if (Path(pdir) / 'node_modules' / 'puppeteer').exists():
                     result = subprocess.run(
-                        ['node', '-e', script],
+                        ['node', '-e', script, url, str(screenshot_path)],
                         cwd=pdir,
                         capture_output=True,
                         timeout=60

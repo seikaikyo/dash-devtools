@@ -17,15 +17,33 @@ console = Console()
 
 # Lighthouse Node.js 腳本
 LIGHTHOUSE_SCRIPT = '''
-const { execSync } = require("child_process");
+const { execFileSync } = require("child_process");
 
 const url = process.argv[2];
 const categories = process.argv[3] || "performance,accessibility,best-practices,seo";
 
+// lighthouse 會載入任意 URL 並執行該頁的 JS，沙箱是主要隔離邊界不是附加防護。
+// 預設保留沙箱；只有在確實需要的環境（容器內以 root 執行）才用環境變數關掉。
+const noSandbox = process.env.DASH_PERF_NO_SANDBOX === "1";
+const chromeFlags = noSandbox
+  ? "--headless --no-sandbox"
+  : "--headless";
+if (noSandbox) {
+  console.error("[warn] DASH_PERF_NO_SANDBOX=1: Chrome sandbox disabled for this run");
+}
+
 try {
-  // 使用 lighthouse CLI
-  const result = execSync(
-    `npx lighthouse "${url}" --output=json --quiet --chrome-flags="--headless --no-sandbox" --only-categories=${categories}`,
+  // 使用 lighthouse CLI（execFile 陣列形式，不經 shell）
+  const result = execFileSync(
+    "npx",
+    [
+      "lighthouse",
+      url,
+      "--output=json",
+      "--quiet",
+      "--chrome-flags=" + chromeFlags,
+      "--only-categories=" + categories
+    ],
     {
       encoding: "utf-8",
       timeout: 120000,
@@ -126,6 +144,18 @@ def run_perf_test(
     Returns:
         測試結果字典
     """
+    # 只接受 http(s)，避免 url 被當成 lighthouse 的參數或其他 scheme
+    if not str(url).lower().startswith(('http://', 'https://')):
+        return {
+            'url': url,
+            'success': False,
+            'error': 'Invalid URL: 只接受 http:// 或 https:// 開頭的網址',
+            'scores': {'performance': 0, 'accessibility': 0, 'bestPractices': 0, 'seo': 0},
+            'metrics': {},
+            'opportunities': [],
+            'diagnostics': []
+        }
+
     # 建立臨時腳本檔案
     with tempfile.NamedTemporaryFile(mode='w', suffix='.js', delete=False) as f:
         f.write(LIGHTHOUSE_SCRIPT)
