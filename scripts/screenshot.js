@@ -12,9 +12,27 @@
  *   --width         視窗寬度 (預設: 1920)
  *   --height        視窗高度 (預設: 1080)
  *   --storage       JSON 格式的 localStorage 設定
+ *
+ * 環境變數：
+ *   DASH_SCREENSHOT_NO_SANDBOX=1
+ *     關閉 Chrome sandbox（--no-sandbox --disable-setuid-sandbox）。
+ *     本工具會導向任意 URL 並執行該頁面的 JavaScript，sandbox 是主要隔離邊界，
+ *     關掉等於讓頁面漏洞直接打到執行帳號。只在容器內確實無法啟用 sandbox 時才開。
  */
 
 const puppeteer = require('puppeteer');
+
+// 預設保留 sandbox；顯式設環境變數才關閉
+const DISABLE_SANDBOX = process.env.DASH_SCREENSHOT_NO_SANDBOX === '1';
+
+function launchArgs() {
+  const args = ['--disable-gpu'];
+  if (DISABLE_SANDBOX) {
+    console.warn('[Screenshot] 警告: sandbox 已關閉 (DASH_SCREENSHOT_NO_SANDBOX=1)');
+    args.push('--no-sandbox', '--disable-setuid-sandbox');
+  }
+  return args;
+}
 
 async function screenshot(options) {
   const {
@@ -31,7 +49,7 @@ async function screenshot(options) {
   const browser = await puppeteer.launch({
     headless: 'new',
     executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu']
+    args: launchArgs()
   });
 
   try {

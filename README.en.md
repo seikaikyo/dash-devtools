@@ -244,6 +244,22 @@ Steps are dynamically adjusted by project type:
 
 Errors block the push; warnings pass with a notice. Each step shows elapsed time.
 
+### Scan scope
+
+Without `GITGUARDIAN_API_KEY` the local regex rules are what actually gate the push.
+Exclusion rules match path components, not substrings: `node_modules/`, `dist/` and `tests/`
+are skipped, while ordinary sources whose path merely contains those words
+(`src/api/distributor.ts`, `src/lib/latest.ts`) are still scanned. `.gitignore` is matched with
+gitignore semantics (directory rules, root anchoring, `!` negation), so a `logs` line does not
+silently skip `src/logs_helper.ts`. Use `.scanignore` for false positives.
+
+### Screenshot sandbox
+
+`scripts/screenshot.js` navigates to arbitrary URLs and runs page JavaScript, so the Chrome
+sandbox is the main isolation boundary and stays on by default. Set
+`DASH_SCREENSHOT_NO_SANDBOX=1` only where a container genuinely cannot enable it; with the
+sandbox off, a page exploit lands directly on the executing account.
+
 ## Claude Code Integration
 
 ### Skill Installation

@@ -12,6 +12,8 @@ import re
 from fnmatch import fnmatch
 from pathlib import Path
 
+from ...path_filters import is_gitignored, is_in_ignored_dir, parse_gitignore
+
 
 class SecurityValidator:
     """安全性驗證器"""
@@ -186,8 +188,8 @@ class SecurityValidator:
         # 跳過巢狀 git repo
         if any(file_str.startswith(repo) for repo in nested_repos):
             return True
-        # 跳過忽略目錄
-        if any(ignore in file_str for ignore in self.IGNORE_DIRS):
+        # 跳過忽略目錄（比對路徑元件，不是子字串）
+        if is_in_ignored_dir(file_path, self.project_path, self.IGNORE_DIRS):
             return True
         return False
 
@@ -254,19 +256,6 @@ class SecurityValidator:
         return False
 
     def _is_gitignored(self, file_path):
-        """檢查檔案是否在 .gitignore 中"""
-        gitignore = self.project_path / '.gitignore'
-        if not gitignore.exists():
-            return False
-
-        content = gitignore.read_text(encoding='utf-8')
+        """檢查檔案是否在 .gitignore 中（gitignore 語意，不是子字串）"""
         rel_path = str(file_path.relative_to(self.project_path))
-
-        for line in content.splitlines():
-            line = line.strip()
-            if not line or line.startswith('#'):
-                continue
-            if line in rel_path or rel_path.startswith(line):
-                return True
-
-        return False
+        return is_gitignored(rel_path, parse_gitignore(self.project_path))

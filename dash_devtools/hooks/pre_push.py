@@ -10,6 +10,7 @@ Pre-push 檢查
 """
 
 from .pre_commit import run_pre_commit_check, SENSITIVE_PATTERNS, parse_scanignore, is_scan_ignored
+from ..path_filters import is_gitignored, is_in_ignored_dir, parse_gitignore
 import re
 import os
 import subprocess
@@ -209,32 +210,7 @@ def run_pre_push_check(project_path):
     scanignore = parse_scanignore(project_path)
 
     # 讀取 .gitignore 檔案
-    gitignore_patterns = []
-    gitignore_file = project / '.gitignore'
-    if gitignore_file.exists():
-        try:
-            for line in gitignore_file.read_text().splitlines():
-                line = line.strip()
-                if line and not line.startswith('#'):
-                    gitignore_patterns.append(line)
-        except Exception:
-            pass
-
-    def is_gitignored(file_path):
-        """檢查檔案是否在 .gitignore 中"""
-        rel_path = str(file_path.relative_to(project))
-        file_name = file_path.name
-        for pattern in gitignore_patterns:
-            # 簡單匹配：完全匹配或 pattern 在路徑中
-            if pattern == file_name or pattern == rel_path:
-                return True
-            if pattern.startswith('*.') and file_name.endswith(pattern[1:]):
-                return True
-            if pattern.endswith('/') and pattern[:-1] in rel_path.split('/'):
-                return True
-            if pattern in rel_path:
-                return True
-        return False
+    gitignore_patterns = parse_gitignore(project)
 
     # 掃描所有檔案（不含 .env，因為應該都在 .gitignore）
     extensions = ['*.js', '*.ts', '*.jsx', '*.tsx', '*.py', '*.json', '*.yaml', '*.yml']
@@ -243,14 +219,14 @@ def run_pre_push_check(project_path):
         for file_path in project.rglob(ext):
             rel_path = str(file_path.relative_to(project))
 
-            # 跳過忽略的目錄
-            if any(ignore in str(file_path) for ignore in ignore_dirs):
+            # 跳過忽略的目錄（比對路徑元件，不是子字串）
+            if is_in_ignored_dir(file_path, project, ignore_dirs):
                 continue
             # 跳過範例檔案
             if file_path.name in ignore_files:
                 continue
             # 跳過 .gitignore 中的檔案
-            if is_gitignored(file_path):
+            if is_gitignored(rel_path, gitignore_patterns):
                 continue
             # 跳過 .scanignore 全排除的檔案
             if is_scan_ignored(rel_path, None, scanignore):

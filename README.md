@@ -151,6 +151,23 @@ dash scan /path/to/project
 1. **GitGuardian** - 如果有 API Key 且安裝了 ggshield
 2. **本地規則** - 備援，使用內建正則表達式
 
+未設定 `GITGUARDIAN_API_KEY` 時實際把關的是本地規則，不是 GitGuardian。
+
+#### 掃描範圍
+
+排除規則比對「路徑元件」不是子字串：`node_modules/` `dist/` `tests/` 這些目錄會跳過，
+但 `src/api/distributor.ts`、`src/lib/latest.ts` 這種路徑剛好含有排除字串的正常原始碼照掃。
+`.gitignore` 以 gitignore 語意比對（目錄型規則、根目錄錨定、`!` 反向規則），
+所以 `.gitignore` 寫 `logs` 不會連帶跳過 `src/logs_helper.ts`。
+
+誤判請用專案根目錄的 `.scanignore` 排除，不要靠改 `.gitignore` 讓掃描器閉嘴。
+
+#### 截圖工具的瀏覽器沙箱
+
+`scripts/screenshot.js` 會導向任意 URL 並執行該頁面的 JavaScript，Chrome sandbox 是主要隔離邊界，
+預設開啟。只有在容器內確實無法啟用時才用 `DASH_SCREENSHOT_NO_SANDBOX=1` 顯式關閉，
+關閉後頁面漏洞會直接打到執行帳號。
+
 ### 資料庫圖表
 
 從 Prisma schema 自動產生 [dbdiagram.io](https://dbdiagram.io) 可分享連結：
