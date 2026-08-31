@@ -11,7 +11,7 @@
 import re
 from pathlib import Path
 
-from ..path_filters import is_gitignored, is_in_ignored_dir, parse_gitignore
+from ..path_filters import is_gitignored, is_in_ignored_dir, is_under, parse_gitignore
 
 
 class SecurityValidator:
@@ -93,7 +93,7 @@ class SecurityValidator:
             for f in files:
                 if f.exists() and f.is_file():
                     # 跳過巢狀 git repo
-                    if any(str(f).startswith(repo) for repo in nested_repos):
+                    if any(is_under(f, repo) for repo in nested_repos):
                         continue
                     # 跳過忽略目錄（比對路徑元件，不是子字串）
                     if is_in_ignored_dir(f, self.project_path, self.IGNORE_DIRS):
@@ -184,7 +184,7 @@ class SecurityValidator:
                 if is_in_ignored_dir(f, self.project_path, self.IGNORE_DIRS):
                     continue
                 # 跳過巢狀 git repo
-                if any(str(f).startswith(repo) for repo in nested_repos):
+                if any(is_under(f, repo) for repo in nested_repos):
                     continue
                 files.append(f)
 

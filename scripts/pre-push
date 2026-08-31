@@ -106,7 +106,18 @@ if [ -n "$CHANGED_FILES" ]; then
     echo "$CHANGED_FILES" | grep -E '\.(js|ts|jsx|tsx|vue|html|css|py|md|json)$' | while read -r file; do
         filepath="$PROJECT_ROOT/$file"
         [ -f "$filepath" ] || continue
-        if grep -lP '[\x{1F300}-\x{1F9FF}\x{2600}-\x{27BF}\x{FE00}-\x{FE0F}\x{1F1E0}-\x{1F1FF}]' "$filepath" >/dev/null 2>&1; then
+        # 原本用 grep -lP，但 macOS 內建的 BSD grep 不支援 -P，錯誤被
+        # 2>/dev/null 吞掉後條件恆為假，這一步從來沒有真的檢查過。
+        # 改用 python3（本專案本來就依賴 Python），行為跨平台一致。
+        if python3 -c '
+import sys
+RANGES = ((0x1F300, 0x1F9FF), (0x2600, 0x27BF), (0xFE00, 0xFE0F), (0x1F1E0, 0x1F1FF))
+try:
+    text = open(sys.argv[1], encoding="utf-8", errors="ignore").read()
+except OSError:
+    sys.exit(1)
+sys.exit(0 if any(lo <= ord(c) <= hi for c in text for lo, hi in RANGES) else 1)
+' "$filepath" 2>/dev/null; then
             echo "   [x] $file"
             echo "EMOJI_FAIL" >> "$TMP_EMOJI"
         fi

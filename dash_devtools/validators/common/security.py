@@ -12,7 +12,7 @@ import re
 from fnmatch import fnmatch
 from pathlib import Path
 
-from ...path_filters import is_gitignored, is_in_ignored_dir, parse_gitignore
+from ...path_filters import is_gitignored, is_in_ignored_dir, is_under, parse_gitignore
 
 
 class SecurityValidator:
@@ -186,7 +186,7 @@ class SecurityValidator:
         """檢查是否應該跳過該檔案"""
         file_str = str(file_path)
         # 跳過巢狀 git repo
-        if any(file_str.startswith(repo) for repo in nested_repos):
+        if any(is_under(file_str, repo) for repo in nested_repos):
             return True
         # 跳過忽略目錄（比對路徑元件，不是子字串）
         if is_in_ignored_dir(file_path, self.project_path, self.IGNORE_DIRS):

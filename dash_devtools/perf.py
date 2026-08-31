@@ -22,6 +22,16 @@ const { execFileSync } = require("child_process");
 const url = process.argv[2];
 const categories = process.argv[3] || "performance,accessibility,best-practices,seo";
 
+// lighthouse 會載入任意 URL 並執行該頁的 JS，沙箱是主要隔離邊界不是附加防護。
+// 預設保留沙箱；只有在確實需要的環境（容器內以 root 執行）才用環境變數關掉。
+const noSandbox = process.env.DASH_PERF_NO_SANDBOX === "1";
+const chromeFlags = noSandbox
+  ? "--headless --no-sandbox"
+  : "--headless";
+if (noSandbox) {
+  console.error("[warn] DASH_PERF_NO_SANDBOX=1: Chrome sandbox disabled for this run");
+}
+
 try {
   // 使用 lighthouse CLI（execFile 陣列形式，不經 shell）
   const result = execFileSync(
@@ -31,7 +41,7 @@ try {
       url,
       "--output=json",
       "--quiet",
-      "--chrome-flags=--headless --no-sandbox",
+      "--chrome-flags=" + chromeFlags,
       "--only-categories=" + categories
     ],
     {

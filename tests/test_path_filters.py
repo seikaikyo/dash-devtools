@@ -7,6 +7,7 @@ import pytest
 from dash_devtools.path_filters import (
     is_gitignored,
     is_in_ignored_dir,
+    is_under,
     parse_gitignore,
     to_relative_parts,
 )
@@ -96,3 +97,28 @@ def test_is_gitignored(rel_path, patterns, expected):
 
 def test_is_gitignored_empty_patterns():
     assert is_gitignored("src/a.ts", []) is False
+
+
+# --- 巢狀 repo 判定：裸 startswith 會把相鄰目錄整批誤跳過 ---
+
+@pytest.mark.parametrize("target, ancestor, expected", [
+    # 真正在底下
+    ("/p/foo/src/a.py", "/p/foo", True),
+    ("/p/foo/a.py", "/p/foo", True),
+    ("/p/foo", "/p/foo", True),
+    # 相鄰目錄：舊的 startswith 會誤判為 True
+    ("/p/foobar/src/a.py", "/p/foo", False),
+    ("/p/foo-legacy/a.py", "/p/foo", False),
+    ("/p/foo2/a.py", "/p/foo", False),
+    # 完全無關
+    ("/q/bar/a.py", "/p/foo", False),
+])
+def test_is_under(target, ancestor, expected, tmp_path):
+    assert is_under(target, ancestor) is expected
+
+
+def test_is_under_matches_old_prefix_bug_cases():
+    """對照組：證明舊寫法在這些案例上是錯的"""
+    target, ancestor = "/p/foobar/src/a.py", "/p/foo"
+    assert str(target).startswith(ancestor) is True   # 舊寫法：誤判為在底下
+    assert is_under(target, ancestor) is False        # 新寫法：正確

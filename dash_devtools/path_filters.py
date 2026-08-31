@@ -29,6 +29,19 @@ def to_relative_parts(file_path, project_path):
     return rel.parts
 
 
+def is_under(file_path, ancestor):
+    """檔案是否位於 ancestor 目錄底下
+
+    裸字串 startswith 會把 /p/foobar/x.py 判成在 /p/foo 底下，讓相鄰目錄
+    整批被誤跳過。改用路徑關係判定，只有真正的祖先才算。
+    """
+    file_path = Path(file_path).resolve()
+    ancestor = Path(ancestor).resolve()
+    if file_path == ancestor:
+        return True
+    return ancestor in file_path.parents
+
+
 def is_in_ignored_dir(file_path, project_path, ignore_dirs):
     """檔案是否位於排除目錄底下
 
